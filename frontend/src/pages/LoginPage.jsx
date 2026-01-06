@@ -32,6 +32,8 @@ export const LoginPage = () => {
       <div 
         className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url('https://images.unsplash.com/photo-1645434926657-6b03be95310d')" }}
+        role="img"
+        aria-label="Construction site aerial view"
       >
         <div className="absolute inset-0 bg-slate-900/85"></div>
       </div>
