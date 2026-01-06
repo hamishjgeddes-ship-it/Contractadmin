@@ -1,0 +1,120 @@
+{
+  "identity": {
+    "name": "MLA Contract Portal",
+    "archetype": "Swiss & High-Contrast",
+    "vibe": "The Digital Blueprint - Precise, Authoritative, Efficient",
+    "emotional_tone": "Control Room",
+    "target_audience": "Construction Clients (External) & Lawyers (Internal)"
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Manrope",
+      "body": "Inter",
+      "mono": "JetBrains Mono"
+    },
+    "weights": {
+      "heading": "font-bold",
+      "body": "font-normal",
+      "mono": "font-medium"
+    },
+    "usage": {
+      "h1": "text-4xl font-bold tracking-tight text-slate-900 font-heading",
+      "h2": "text-2xl font-semibold tracking-tight text-slate-900 font-heading",
+      "h3": "text-xl font-medium text-slate-900 font-heading",
+      "body": "text-sm text-slate-600 leading-relaxed font-body",
+      "label": "text-xs font-bold uppercase tracking-wider text-slate-500 font-mono",
+      "kpi": "text-3xl font-mono font-bold text-slate-900 tracking-tighter"
+    }
+  },
+  "colors": {
+    "palette": {
+      "primary": "#0f172a",
+      "primary_foreground": "#f8fafc",
+      "secondary": "#f1f5f9",
+      "secondary_foreground": "#0f172a",
+      "accent": "#f97316",
+      "accent_foreground": "#ffffff",
+      "background": "#ffffff",
+      "surface": "#ffffff",
+      "border": "#e2e8f0",
+      "muted": "#f8fafc",
+      "muted_foreground": "#64748b",
+      "destructive": "#ef4444",
+      "success": "#10b981"
+    },
+    "usage_rules": {
+      "background": "bg-white",
+      "surface": "bg-white border border-slate-200",
+      "primary_action": "bg-slate-900 text-white hover:bg-slate-800",
+      "secondary_action": "bg-slate-100 text-slate-900 hover:bg-slate-200",
+      "accent_indicator": "text-orange-500",
+      "border_subtle": "border-slate-200",
+      "text_main": "text-slate-900",
+      "text_muted": "text-slate-500"
+    }
+  },
+  "layout": {
+    "grid_system": "The Control Room",
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "spacing": {
+      "section_gap": "py-12",
+      "component_gap": "gap-6",
+      "internal_padding": "p-6"
+    },
+    "rules": [
+      "Use dense grids for dashboards (grid-cols-4 or grid-cols-12)",
+      "Always use 1px borders to separate content areas",
+      "Avoid large white spaces in data views; keep it compact",
+      "Use 'Bento' style asymmetry for the project overview"
+    ]
+  },
+  "components": {
+    "radius": "rounded-sm",
+    "shadows": "shadow-none",
+    "border_width": "border",
+    "style_overrides": {
+      "card": "rounded-sm border border-slate-200 bg-white shadow-none",
+      "button": "rounded-sm font-medium tracking-wide uppercase text-xs h-10 px-6",
+      "input": "rounded-sm border-slate-200 focus:ring-2 focus:ring-slate-900 focus:border-transparent",
+      "badge": "rounded-none font-mono uppercase text-[10px] tracking-widest px-2 py-0.5"
+    }
+  },
+  "visual_enhancers": {
+    "textures": "Subtle noise overlay on sidebar or dark backgrounds",
+    "decorations": "Technical lines, crosshairs at intersections, blueprint-style grids",
+    "icons": "Lucide React (Stroke width 1.5px for elegance)",
+    "motion": "Fast, precise transitions (duration-200 ease-out). No bounce."
+  },
+  "image_urls": {
+    "hero_construction": "https://images.unsplash.com/photo-1645434926657-6b03be95310d",
+    "detail_crane": "https://images.unsplash.com/photo-1644411813513-ad77c1b77581",
+    "meeting_professional": "https://images.pexels.com/photos/5060979/pexels-photo-5060979.jpeg",
+    "abstract_architecture": "https://images.unsplash.com/photo-1765405016361-5881d4f8982b"
+  },
+  "instructions_to_main_agent": [
+    "Implement the 'Control Room' grid for the main dashboard.",
+    "Use Manrope for all headings and JetBrains Mono for all numbers/dates/IDs.",
+    "Keep the UI flat and border-heavy. Avoid drop shadows.",
+    "Use the Safety Orange (#f97316) sparingly for alerts, deadlines, and active states.",
+    "Ensure the Client Portal is read-only and extremely simple (mostly lists and status cards).",
+    "Use the 'hero_construction' image for the login page background with a heavy dark overlay.",
+    "Add 'data-testid' to all interactive elements."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) ONLY for overlays/modals.",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms.",
+    "You MUST NOT center align the app container.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations.",
+    "NEVER: use AI assistant Emoji characters.",
+    "Every interaction needs micro-animations - hover states, transitions.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Components MUST use named exports.",
+    "Pages MUST use default exports.",
+    "Use 'sonner' for toasts."
+  ]
+}
