@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Response, Request, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Response, Request, Depends, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -11,6 +11,7 @@ from typing import List, Optional
 import uuid
 import httpx
 from datetime import datetime, timezone, timedelta
+import base64
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -21,7 +22,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Create the main app
-app = FastAPI(title="MLA Contract Compliance Portal")
+app = FastAPI(title="Build Compliance Portal")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -54,6 +55,14 @@ class Project(BaseModel):
     contract_type: str
     description: Optional[str] = None
     status: str = "active"  # active, completed, on_hold
+    # Value tracking
+    starting_value: float = 0.0
+    current_value: float = 0.0
+    # Date tracking
+    start_date: Optional[str] = None
+    original_completion_date: Optional[str] = None
+    current_completion_date: Optional[str] = None
+    # Legacy fields
     key_dates: dict = Field(default_factory=dict)
     commercial_params: dict = Field(default_factory=dict)
     assigned_lawyers: List[str] = Field(default_factory=list)
@@ -67,8 +76,11 @@ class ProjectCreate(BaseModel):
     client_email: EmailStr
     contract_type: str
     description: Optional[str] = None
-    key_dates: dict = Field(default_factory=dict)
-    commercial_params: dict = Field(default_factory=dict)
+    starting_value: float = 0.0
+    current_value: float = 0.0
+    start_date: Optional[str] = None
+    original_completion_date: Optional[str] = None
+    current_completion_date: Optional[str] = None
 
 class Deadline(BaseModel):
     deadline_id: str = Field(default_factory=lambda: f"dl_{uuid.uuid4().hex[:12]}")
@@ -78,7 +90,12 @@ class Deadline(BaseModel):
     due_date: datetime
     status: str = "pending"  # pending, completed, overdue, suppressed
     priority: str = "medium"  # low, medium, high, critical
-    reminder_sent: bool = False
+    # Escalation tracking
+    reminder_7_sent: bool = False
+    reminder_3_sent: bool = False
+    reminder_1_sent: bool = False
+    escalated: bool = False
+    escalation_sent_at: Optional[datetime] = None
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -134,10 +151,45 @@ class Notification(BaseModel):
     user_id: str
     title: str
     message: str
-    notification_type: str  # deadline, notice, project, system
+    notification_type: str  # deadline, notice, project, system, escalation
     reference_id: Optional[str] = None
     is_read: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Document(BaseModel):
+    document_id: str = Field(default_factory=lambda: f"doc_{uuid.uuid4().hex[:12]}")
+    project_id: str
+    filename: str
+    file_type: str
+    file_size: int
+    category: str = "general"  # contract, notice, correspondence, report, general
+    description: Optional[str] = None
+    uploaded_by: str
+    content_base64: Optional[str] = None  # Store small files directly
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class DocumentCreate(BaseModel):
+    project_id: str
+    filename: str
+    category: str = "general"
+    description: Optional[str] = None
+
+class AssistanceRequest(BaseModel):
+    request_id: str = Field(default_factory=lambda: f"req_{uuid.uuid4().hex[:12]}")
+    project_id: str
+    user_id: str
+    subject: str
+    message: str
+    status: str = "pending"  # pending, in_progress, resolved
+    priority: str = "normal"  # normal, urgent
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    resolved_at: Optional[datetime] = None
+
+class AssistanceRequestCreate(BaseModel):
+    project_id: str
+    subject: str
+    message: str
+    priority: str = "normal"
 
 # ============ AUTH HELPERS ============
 
@@ -175,6 +227,95 @@ async def require_lawyer(user: User = Depends(get_current_user)) -> User:
     if user.role not in ["lawyer", "admin"]:
         raise HTTPException(status_code=403, detail="Access denied. Lawyers only.")
     return user
+
+# ============ ESCALATION LOGIC ============
+
+async def check_and_send_escalations():
+    """Background task to check deadlines and send escalations."""
+    now = datetime.now(timezone.utc)
+    
+    # Find all pending deadlines
+    deadlines = await db.deadlines.find({"status": "pending"}, {"_id": 0}).to_list(1000)
+    
+    for deadline in deadlines:
+        due_date = deadline.get("due_date")
+        if isinstance(due_date, str):
+            due_date = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
+        if due_date.tzinfo is None:
+            due_date = due_date.replace(tzinfo=timezone.utc)
+        
+        days_until = (due_date - now).days
+        deadline_id = deadline["deadline_id"]
+        project_id = deadline["project_id"]
+        
+        # Get project for context
+        project = await db.projects.find_one({"project_id": project_id}, {"_id": 0})
+        if not project:
+            continue
+        
+        # Check if overdue
+        if days_until < 0 and not deadline.get("escalated"):
+            # Mark as overdue and escalate
+            await db.deadlines.update_one(
+                {"deadline_id": deadline_id},
+                {"$set": {
+                    "status": "overdue",
+                    "escalated": True,
+                    "escalation_sent_at": now.isoformat()
+                }}
+            )
+            # Notify all lawyers
+            lawyers = await db.users.find({"role": {"$in": ["lawyer", "admin"]}}, {"_id": 0}).to_list(100)
+            for lawyer in lawyers:
+                await create_notification(
+                    lawyer["user_id"],
+                    f"ESCALATION: Overdue Deadline",
+                    f"Deadline '{deadline['title']}' for project '{project['name']}' is overdue!",
+                    "escalation",
+                    deadline_id
+                )
+        
+        # 7-day reminder
+        elif days_until <= 7 and days_until > 3 and not deadline.get("reminder_7_sent"):
+            await db.deadlines.update_one(
+                {"deadline_id": deadline_id},
+                {"$set": {"reminder_7_sent": True}}
+            )
+            await create_notification(
+                deadline["created_by"],
+                "Deadline Reminder - 7 Days",
+                f"Deadline '{deadline['title']}' is due in {days_until} days",
+                "deadline",
+                deadline_id
+            )
+        
+        # 3-day reminder
+        elif days_until <= 3 and days_until > 1 and not deadline.get("reminder_3_sent"):
+            await db.deadlines.update_one(
+                {"deadline_id": deadline_id},
+                {"$set": {"reminder_3_sent": True}}
+            )
+            await create_notification(
+                deadline["created_by"],
+                "Deadline Reminder - 3 Days",
+                f"URGENT: Deadline '{deadline['title']}' is due in {days_until} days",
+                "deadline",
+                deadline_id
+            )
+        
+        # 1-day reminder
+        elif days_until <= 1 and days_until >= 0 and not deadline.get("reminder_1_sent"):
+            await db.deadlines.update_one(
+                {"deadline_id": deadline_id},
+                {"$set": {"reminder_1_sent": True}}
+            )
+            await create_notification(
+                deadline["created_by"],
+                "Deadline Reminder - Tomorrow!",
+                f"CRITICAL: Deadline '{deadline['title']}' is due tomorrow!",
+                "deadline",
+                deadline_id
+            )
 
 # ============ AUTH ENDPOINTS ============
 
@@ -357,6 +498,36 @@ async def update_project(project_id: str, updates: dict, user: User = Depends(re
         raise HTTPException(status_code=404, detail="Project not found")
     return {"message": "Project updated"}
 
+@api_router.get("/projects/{project_id}/summary")
+async def get_project_summary(project_id: str, user: User = Depends(get_current_user)):
+    """Get project summary with outstanding items."""
+    project = await db.projects.find_one({"project_id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Check access
+    if user.role == "client" and project.get("client_email") != user.email:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Get outstanding items
+    pending_deadlines = await db.deadlines.count_documents({"project_id": project_id, "status": "pending"})
+    overdue_deadlines = await db.deadlines.count_documents({"project_id": project_id, "status": "overdue"})
+    draft_notices = await db.notices.count_documents({"project_id": project_id, "status": "draft"})
+    issued_notices = await db.notices.count_documents({"project_id": project_id, "status": "issued"})
+    active_questionnaires = await db.questionnaires.count_documents({"project_id": project_id, "status": "active"})
+    
+    return {
+        "project": project,
+        "outstanding": {
+            "pending_deadlines": pending_deadlines,
+            "overdue_deadlines": overdue_deadlines,
+            "draft_notices": draft_notices,
+            "issued_notices": issued_notices,
+            "active_questionnaires": active_questionnaires,
+            "total_action_items": pending_deadlines + overdue_deadlines + draft_notices
+        }
+    }
+
 # ============ DEADLINE ENDPOINTS ============
 
 @api_router.get("/deadlines", response_model=List[dict])
@@ -530,6 +701,129 @@ async def respond_to_questionnaire(questionnaire_id: str, responses: dict, user:
     )
     return {"message": "Responses submitted"}
 
+# ============ DOCUMENT LIBRARY ENDPOINTS ============
+
+@api_router.get("/documents", response_model=List[dict])
+async def list_documents(user: User = Depends(get_current_user), project_id: Optional[str] = None):
+    """List documents."""
+    query = {}
+    if project_id:
+        query["project_id"] = project_id
+    
+    if user.role == "client":
+        projects = await db.projects.find({"client_email": user.email}, {"project_id": 1, "_id": 0}).to_list(1000)
+        project_ids = [p["project_id"] for p in projects]
+        query["project_id"] = {"$in": project_ids}
+    
+    # Don't return content_base64 in list view
+    documents = await db.documents.find(query, {"_id": 0, "content_base64": 0}).to_list(1000)
+    return documents
+
+@api_router.post("/documents")
+async def upload_document(
+    project_id: str,
+    category: str = "general",
+    description: str = "",
+    file: UploadFile = File(...),
+    user: User = Depends(require_lawyer)
+):
+    """Upload a document (lawyers only)."""
+    # Read file content
+    content = await file.read()
+    file_size = len(content)
+    
+    # Max 10MB
+    if file_size > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max 10MB.")
+    
+    # Create document record
+    doc = Document(
+        project_id=project_id,
+        filename=file.filename,
+        file_type=file.content_type or "application/octet-stream",
+        file_size=file_size,
+        category=category,
+        description=description,
+        uploaded_by=user.user_id,
+        content_base64=base64.b64encode(content).decode('utf-8')
+    )
+    
+    doc_dict = doc.model_dump()
+    doc_dict['created_at'] = doc_dict['created_at'].isoformat()
+    await db.documents.insert_one(doc_dict)
+    
+    # Return without content
+    return {k: v for k, v in doc_dict.items() if k not in ["_id", "content_base64"]}
+
+@api_router.get("/documents/{document_id}")
+async def get_document(document_id: str, user: User = Depends(get_current_user)):
+    """Get document with content."""
+    document = await db.documents.find_one({"document_id": document_id}, {"_id": 0})
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Check access
+    if user.role == "client":
+        project = await db.projects.find_one({"project_id": document["project_id"]}, {"_id": 0})
+        if not project or project.get("client_email") != user.email:
+            raise HTTPException(status_code=403, detail="Access denied")
+    
+    return document
+
+@api_router.delete("/documents/{document_id}")
+async def delete_document(document_id: str, user: User = Depends(require_lawyer)):
+    """Delete document (lawyers only)."""
+    result = await db.documents.delete_one({"document_id": document_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"message": "Document deleted"}
+
+# ============ ASSISTANCE REQUEST ENDPOINTS ============
+
+@api_router.get("/assistance-requests", response_model=List[dict])
+async def list_assistance_requests(user: User = Depends(get_current_user)):
+    """List assistance requests."""
+    if user.role in ["lawyer", "admin"]:
+        requests = await db.assistance_requests.find({}, {"_id": 0}).to_list(1000)
+    else:
+        requests = await db.assistance_requests.find({"user_id": user.user_id}, {"_id": 0}).to_list(1000)
+    return requests
+
+@api_router.post("/assistance-requests", response_model=dict)
+async def create_assistance_request(req_data: AssistanceRequestCreate, user: User = Depends(get_current_user)):
+    """Create an assistance request."""
+    request = AssistanceRequest(
+        **req_data.model_dump(),
+        user_id=user.user_id
+    )
+    doc = request.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.assistance_requests.insert_one(doc)
+    
+    # Notify lawyers
+    lawyers = await db.users.find({"role": {"$in": ["lawyer", "admin"]}}, {"_id": 0}).to_list(100)
+    project = await db.projects.find_one({"project_id": req_data.project_id}, {"_id": 0})
+    for lawyer in lawyers:
+        await create_notification(
+            lawyer["user_id"],
+            f"New Assistance Request{' - URGENT' if req_data.priority == 'urgent' else ''}",
+            f"{user.name} needs help with project '{project['name'] if project else req_data.project_id}': {req_data.subject}",
+            "system",
+            request.request_id
+        )
+    
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+@api_router.patch("/assistance-requests/{request_id}")
+async def update_assistance_request(request_id: str, updates: dict, user: User = Depends(require_lawyer)):
+    """Update assistance request status (lawyers only)."""
+    if updates.get("status") == "resolved":
+        updates["resolved_at"] = datetime.now(timezone.utc).isoformat()
+    result = await db.assistance_requests.update_one({"request_id": request_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+    return {"message": "Request updated"}
+
 # ============ NOTIFICATION ENDPOINTS ============
 
 async def create_notification(user_id: str, title: str, message: str, notification_type: str, reference_id: str = None):
@@ -577,22 +871,30 @@ async def mark_all_notifications_read(user: User = Depends(get_current_user)):
 # ============ DASHBOARD STATS ============
 
 @api_router.get("/dashboard/stats")
-async def get_dashboard_stats(user: User = Depends(get_current_user)):
+async def get_dashboard_stats(user: User = Depends(get_current_user), background_tasks: BackgroundTasks = None):
     """Get dashboard statistics."""
+    # Run escalation check in background
+    if background_tasks:
+        background_tasks.add_task(check_and_send_escalations)
+    
     if user.role in ["lawyer", "admin"]:
         total_projects = await db.projects.count_documents({})
         active_projects = await db.projects.count_documents({"status": "active"})
         pending_deadlines = await db.deadlines.count_documents({"status": "pending"})
+        overdue_deadlines = await db.deadlines.count_documents({"status": "overdue"})
         draft_notices = await db.notices.count_documents({"status": "draft"})
         issued_notices = await db.notices.count_documents({"status": "issued"})
+        pending_requests = await db.assistance_requests.count_documents({"status": "pending"})
     else:
         projects = await db.projects.find({"client_email": user.email}, {"project_id": 1, "_id": 0}).to_list(1000)
         project_ids = [p["project_id"] for p in projects]
         total_projects = len(project_ids)
         active_projects = await db.projects.count_documents({"project_id": {"$in": project_ids}, "status": "active"})
         pending_deadlines = await db.deadlines.count_documents({"project_id": {"$in": project_ids}, "status": "pending"})
+        overdue_deadlines = await db.deadlines.count_documents({"project_id": {"$in": project_ids}, "status": "overdue"})
         draft_notices = 0
         issued_notices = await db.notices.count_documents({"project_id": {"$in": project_ids}, "status": {"$ne": "draft"}})
+        pending_requests = await db.assistance_requests.count_documents({"user_id": user.user_id, "status": "pending"})
     
     # Get upcoming deadlines
     now = datetime.now(timezone.utc).isoformat()
@@ -605,20 +907,67 @@ async def get_dashboard_stats(user: User = Depends(get_current_user)):
         "total_projects": total_projects,
         "active_projects": active_projects,
         "pending_deadlines": pending_deadlines,
+        "overdue_deadlines": overdue_deadlines,
         "draft_notices": draft_notices,
         "issued_notices": issued_notices,
+        "pending_requests": pending_requests,
         "upcoming_deadlines": upcoming_deadlines
+    }
+
+# ============ API INTEGRATIONS INFO ============
+
+@api_router.get("/integrations/available")
+async def list_available_integrations():
+    """List available API integrations."""
+    return {
+        "integrations": [
+            {
+                "id": "webhook",
+                "name": "Webhooks",
+                "description": "Send notifications to external systems via webhooks",
+                "status": "available",
+                "config_required": ["webhook_url"]
+            },
+            {
+                "id": "email",
+                "name": "Email Notifications",
+                "description": "Send email notifications via SendGrid",
+                "status": "ready",
+                "config_required": ["sendgrid_api_key", "sender_email"]
+            },
+            {
+                "id": "teams",
+                "name": "Microsoft Teams",
+                "description": "Post notifications to Teams channels",
+                "status": "planned",
+                "config_required": ["teams_webhook_url"]
+            },
+            {
+                "id": "zoom",
+                "name": "Zoom",
+                "description": "Schedule and manage meetings",
+                "status": "planned",
+                "config_required": ["zoom_api_key", "zoom_api_secret"]
+            },
+            {
+                "id": "calendar",
+                "name": "Calendar Sync",
+                "description": "Sync deadlines with Google/Outlook calendar",
+                "status": "planned",
+                "config_required": ["calendar_oauth"]
+            }
+        ]
     }
 
 # ============ HEALTH CHECK ============
 
 @api_router.get("/")
 async def root():
-    return {"message": "MLA Contract Compliance Portal API"}
+    return {"message": "Build Compliance Portal API"}
 
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "mla-portal"}
+    return {"status": "healthy", "service": "build-compliance"}
 
 # Include the router
 app.include_router(api_router)

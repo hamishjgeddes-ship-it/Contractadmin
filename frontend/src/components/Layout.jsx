@@ -10,8 +10,9 @@ import {
   Bell,
   LogOut,
   Menu,
-  X,
-  ChevronRight
+  ChevronRight,
+  FolderOpen,
+  Plug
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -38,7 +39,9 @@ export const Layout = ({ children, user }) => {
     { path: "/projects", label: "Projects", icon: FolderKanban, show: true },
     { path: "/deadlines", label: "Deadlines", icon: CalendarClock, show: true },
     { path: "/notices", label: "Notices", icon: FileText, show: true },
+    { path: "/documents", label: "Documents", icon: FolderOpen, show: true },
     { path: "/questionnaires", label: "Questionnaires", icon: ClipboardList, show: true },
+    { path: "/integrations", label: "Integrations", icon: Plug, show: isLawyer },
     { path: "/users", label: "Users", icon: Users, show: isLawyer },
   ].filter(item => item.show);
 
@@ -83,10 +86,10 @@ export const Layout = ({ children, user }) => {
           <div className="p-6 border-b border-slate-800">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-orange-500 flex items-center justify-center">
-                <span className="font-heading font-bold text-white text-sm">M</span>
+                <span className="font-heading font-bold text-white text-sm">B</span>
               </div>
               <div>
-                <span className="font-heading font-bold text-white text-sm tracking-tight block">MLA Portal</span>
+                <span className="font-heading font-bold text-white text-sm tracking-tight block">Build Compliance</span>
                 <span className="text-[10px] text-slate-400 uppercase tracking-wider">Contract Admin</span>
               </div>
             </div>
