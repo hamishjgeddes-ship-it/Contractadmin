@@ -274,6 +274,86 @@ class BuildCompliancePortalTester:
         except Exception as e:
             return self.log_test("Complete Deadline", False, f"Error: {str(e)}")
 
+    def test_list_documents(self):
+        """Test listing documents"""
+        try:
+            response = requests.get(f"{self.api_url}/documents", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Count: {len(data)} documents"
+            return self.log_test("List Documents", success, details)
+        except Exception as e:
+            return self.log_test("List Documents", False, f"Error: {str(e)}")
+
+    def test_create_assistance_request(self):
+        """Test creating assistance request"""
+        if not self.project_id:
+            return self.log_test("Create Assistance Request", False, "No project ID available")
+        
+        try:
+            request_data = {
+                "project_id": self.project_id,
+                "subject": "Test Assistance Request",
+                "message": "Need help with contract interpretation for variation claim",
+                "priority": "normal"
+            }
+            response = requests.post(f"{self.api_url}/assistance-requests", json=request_data, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                self.assistance_request_id = data.get('request_id')
+                details += f", Request ID: {self.assistance_request_id}"
+            return self.log_test("Create Assistance Request", success, details)
+        except Exception as e:
+            return self.log_test("Create Assistance Request", False, f"Error: {str(e)}")
+
+    def test_list_assistance_requests(self):
+        """Test listing assistance requests"""
+        try:
+            response = requests.get(f"{self.api_url}/assistance-requests", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Count: {len(data)} requests"
+            return self.log_test("List Assistance Requests", success, details)
+        except Exception as e:
+            return self.log_test("List Assistance Requests", False, f"Error: {str(e)}")
+
+    def test_available_integrations(self):
+        """Test available integrations endpoint"""
+        try:
+            response = requests.get(f"{self.api_url}/integrations/available", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                integrations = data.get('integrations', [])
+                details += f", Count: {len(integrations)} integrations"
+            return self.log_test("Available Integrations", success, details)
+        except Exception as e:
+            return self.log_test("Available Integrations", False, f"Error: {str(e)}")
+
+    def test_project_summary(self):
+        """Test project summary endpoint"""
+        if not self.project_id:
+            return self.log_test("Project Summary", False, "No project ID available")
+        
+        try:
+            response = requests.get(f"{self.api_url}/projects/{self.project_id}/summary", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                outstanding = data.get('outstanding', {})
+                details += f", Outstanding items: {outstanding.get('total_action_items', 0)}"
+            return self.log_test("Project Summary", success, details)
+        except Exception as e:
+            return self.log_test("Project Summary", False, f"Error: {str(e)}")
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚀 Starting MLA Contract Compliance Portal Backend Tests")
