@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -22,6 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
+import { Calendar } from "../components/ui/calendar";
 import { 
   ArrowRight,
   CalendarClock,
@@ -32,7 +38,9 @@ import {
   HelpCircle,
   FolderOpen,
   Clock,
-  CheckCircle2
+  Plus,
+  CalendarIcon,
+  FolderKanban
 } from "lucide-react";
 import axios from "axios";
 import { API } from "../App";
@@ -40,34 +48,57 @@ import { toast } from "sonner";
 import { format, parseISO, differenceInDays, isBefore, addDays } from "date-fns";
 
 export const DashboardPage = ({ user }) => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [assistanceDialogOpen, setAssistanceDialogOpen] = useState(false);
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [startDate, setStartDate] = useState(null);
+  const [originalCompletionDate, setOriginalCompletionDate] = useState(null);
+  
   const [assistanceForm, setAssistanceForm] = useState({
     subject: "",
     message: "",
     priority: "normal"
   });
 
+  const [projectForm, setProjectForm] = useState({
+    name: "",
+    client_name: "",
+    client_email: "",
+    contract_type: "",
+    description: "",
+    starting_value: "",
+    current_value: "",
+    location: "",
+    owner: "",
+    builder: "",
+    subcontractors: "",
+    client_team_members: "",
+    bc_team_members: "",
+  });
+
   const isLawyer = user?.role === "lawyer" || user?.role === "admin";
 
+  const fetchData = async () => {
+    try {
+      const [statsRes, projectsRes] = await Promise.all([
+        axios.get(`${API}/dashboard/stats`, { withCredentials: true }),
+        axios.get(`${API}/projects`, { withCredentials: true })
+      ]);
+      setStats(statsRes.data);
+      setProjects(projectsRes.data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsRes, projectsRes] = await Promise.all([
-          axios.get(`${API}/dashboard/stats`, { withCredentials: true }),
-          axios.get(`${API}/projects`, { withCredentials: true })
-        ]);
-        setStats(statsRes.data);
-        setProjects(projectsRes.data);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
   }, []);
 
@@ -88,6 +119,47 @@ export const DashboardPage = ({ user }) => {
       setSelectedProject("");
     } catch (error) {
       toast.error("Failed to submit request");
+    }
+  };
+
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      const payload = {
+        name: projectForm.name,
+        client_name: projectForm.client_name,
+        client_email: projectForm.client_email,
+        contract_type: projectForm.contract_type,
+        description: projectForm.description,
+        starting_value: parseFloat(projectForm.starting_value) || 0,
+        current_value: parseFloat(projectForm.current_value) || parseFloat(projectForm.starting_value) || 0,
+        start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
+        original_completion_date: originalCompletionDate ? format(originalCompletionDate, "yyyy-MM-dd") : null,
+        current_completion_date: originalCompletionDate ? format(originalCompletionDate, "yyyy-MM-dd") : null,
+        location: projectForm.location,
+        owner: projectForm.owner,
+        builder: projectForm.builder,
+        subcontractors: projectForm.subcontractors,
+        client_team_members: projectForm.client_team_members,
+        bc_team_members: projectForm.bc_team_members,
+      };
+      await axios.post(`${API}/projects`, payload, { withCredentials: true });
+      toast.success("Project created successfully");
+      setProjectDialogOpen(false);
+      setProjectForm({
+        name: "", client_name: "", client_email: "", contract_type: "", description: "",
+        starting_value: "", current_value: "", location: "", owner: "", builder: "",
+        subcontractors: "", client_team_members: "", bc_team_members: "",
+      });
+      setStartDate(null);
+      setOriginalCompletionDate(null);
+      fetchData();
+    } catch (error) {
+      console.error("Error creating project:", error);
+      toast.error("Failed to create project");
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -125,6 +197,8 @@ export const DashboardPage = ({ user }) => {
     }).format(value);
   };
 
+  const contractTypes = ["AS4000", "AS4902", "AS2124", "NEC4", "FIDIC", "JCT", "Custom"];
+
   if (loading) {
     return (
       <Layout user={user}>
@@ -152,119 +226,385 @@ export const DashboardPage = ({ user }) => {
             </p>
           </div>
 
-          {/* Request Assistance Button */}
-          <Dialog open={assistanceDialogOpen} onOpenChange={setAssistanceDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                className="bg-orange-500 hover:bg-orange-600 text-white rounded-sm h-10 px-6 text-xs uppercase tracking-wide font-medium"
-                data-testid="request-assistance-btn"
-              >
-                <HelpCircle className="w-4 h-4 mr-2" /> Request Assistance
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle className="font-heading">Request Assistance</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleRequestAssistance} className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label>Project</Label>
-                  <Select value={selectedProject} onValueChange={setSelectedProject}>
-                    <SelectTrigger data-testid="assistance-project-select" className="rounded-sm">
-                      <SelectValue placeholder="Select project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((p) => (
-                        <SelectItem key={p.project_id} value={p.project_id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Subject</Label>
-                  <Input
-                    data-testid="assistance-subject-input"
-                    value={assistanceForm.subject}
-                    onChange={(e) => setAssistanceForm({ ...assistanceForm, subject: e.target.value })}
-                    placeholder="Brief description of your request"
-                    required
-                    className="rounded-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Message</Label>
-                  <Textarea
-                    data-testid="assistance-message-input"
-                    value={assistanceForm.message}
-                    onChange={(e) => setAssistanceForm({ ...assistanceForm, message: e.target.value })}
-                    placeholder="Provide details about the assistance you need..."
-                    rows={4}
-                    required
-                    className="rounded-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Priority</Label>
-                  <Select 
-                    value={assistanceForm.priority} 
-                    onValueChange={(v) => setAssistanceForm({ ...assistanceForm, priority: v })}
+          <div className="flex items-center gap-3">
+            {/* Add New Project Button */}
+            {isLawyer && (
+              <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    className="bg-slate-900 hover:bg-slate-800 text-white rounded-sm h-10 px-6 text-xs uppercase tracking-wide font-medium"
+                    data-testid="add-new-project-btn"
                   >
-                    <SelectTrigger className="rounded-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setAssistanceDialogOpen(false)} className="rounded-sm">
-                    Cancel
+                    <Plus className="w-4 h-4 mr-2" /> Add New Project
                   </Button>
-                  <Button type="submit" className="bg-orange-500 hover:bg-orange-600 rounded-sm" data-testid="submit-assistance-btn">
-                    Submit Request
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="font-heading">Create New Project</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleCreateProject} className="space-y-4 mt-4">
+                    {/* Basic Info */}
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Project Name *</Label>
+                      <Input
+                        id="name"
+                        data-testid="new-project-name"
+                        value={projectForm.name}
+                        onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })}
+                        placeholder="e.g., Melbourne Tower Development"
+                        required
+                        className="rounded-sm"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Contract Type *</Label>
+                        <Select
+                          value={projectForm.contract_type}
+                          onValueChange={(v) => setProjectForm({ ...projectForm, contract_type: v })}
+                        >
+                          <SelectTrigger className="rounded-sm">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {contractTypes.map((type) => (
+                              <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Location</Label>
+                        <Input
+                          value={projectForm.location}
+                          onChange={(e) => setProjectForm({ ...projectForm, location: e.target.value })}
+                          placeholder="Project location"
+                          className="rounded-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Time - Dates */}
+                    <div className="border-t pt-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono mb-3">Time</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Start Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-left font-normal rounded-sm">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {startDate ? format(startDate, "PPP") : "Select date"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Original Completion Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-left font-normal rounded-sm">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {originalCompletionDate ? format(originalCompletionDate, "PPP") : "Select date"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar mode="single" selected={originalCompletionDate} onSelect={setOriginalCompletionDate} initialFocus />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cost */}
+                    <div className="border-t pt-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono mb-3">Cost</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Starting Contract Value ($)</Label>
+                          <Input
+                            type="number"
+                            value={projectForm.starting_value}
+                            onChange={(e) => setProjectForm({ ...projectForm, starting_value: e.target.value })}
+                            placeholder="0"
+                            className="rounded-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Current Value ($)</Label>
+                          <Input
+                            type="number"
+                            value={projectForm.current_value}
+                            onChange={(e) => setProjectForm({ ...projectForm, current_value: e.target.value })}
+                            placeholder="Same as starting"
+                            className="rounded-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stakeholders */}
+                    <div className="border-t pt-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono mb-3">Stakeholders</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Owner</Label>
+                          <Input
+                            value={projectForm.owner}
+                            onChange={(e) => setProjectForm({ ...projectForm, owner: e.target.value })}
+                            placeholder="Project owner/principal"
+                            className="rounded-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Builder</Label>
+                          <Input
+                            value={projectForm.builder}
+                            onChange={(e) => setProjectForm({ ...projectForm, builder: e.target.value })}
+                            placeholder="Head contractor"
+                            className="rounded-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2 mt-4">
+                        <Label>Subcontractors</Label>
+                        <Textarea
+                          value={projectForm.subcontractors}
+                          onChange={(e) => setProjectForm({ ...projectForm, subcontractors: e.target.value })}
+                          placeholder="List key subcontractors (one per line)"
+                          rows={2}
+                          className="rounded-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Team Members */}
+                    <div className="border-t pt-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono mb-3">Team Members</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Client Team</Label>
+                          <Textarea
+                            value={projectForm.client_team_members}
+                            onChange={(e) => setProjectForm({ ...projectForm, client_team_members: e.target.value })}
+                            placeholder="Client team members (one per line)"
+                            rows={2}
+                            className="rounded-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Build Compliance Team</Label>
+                          <Textarea
+                            value={projectForm.bc_team_members}
+                            onChange={(e) => setProjectForm({ ...projectForm, bc_team_members: e.target.value })}
+                            placeholder="Assigned BC team (one per line)"
+                            rows={2}
+                            className="rounded-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Client Contact */}
+                    <div className="border-t pt-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono mb-3">Client Contact</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Client Name *</Label>
+                          <Input
+                            value={projectForm.client_name}
+                            onChange={(e) => setProjectForm({ ...projectForm, client_name: e.target.value })}
+                            placeholder="Company name"
+                            required
+                            className="rounded-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Client Email *</Label>
+                          <Input
+                            type="email"
+                            value={projectForm.client_email}
+                            onChange={(e) => setProjectForm({ ...projectForm, client_email: e.target.value })}
+                            placeholder="client@company.com"
+                            required
+                            className="rounded-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <Textarea
+                        value={projectForm.description}
+                        onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })}
+                        placeholder="Brief project description..."
+                        rows={2}
+                        className="rounded-sm"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                      <Button type="button" variant="outline" onClick={() => setProjectDialogOpen(false)} className="rounded-sm">
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={creating} className="bg-slate-900 hover:bg-slate-800 rounded-sm" data-testid="submit-new-project">
+                        {creating ? "Creating..." : "Create Project"}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {/* Request Assistance Button */}
+            <Dialog open={assistanceDialogOpen} onOpenChange={setAssistanceDialogOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  className="bg-orange-500 hover:bg-orange-600 text-white rounded-sm h-10 px-6 text-xs uppercase tracking-wide font-medium"
+                  data-testid="request-assistance-btn"
+                >
+                  <HelpCircle className="w-4 h-4 mr-2" /> Request Assistance
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="font-heading">Request Assistance</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleRequestAssistance} className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label>Project</Label>
+                    <Select value={selectedProject} onValueChange={setSelectedProject}>
+                      <SelectTrigger data-testid="assistance-project-select" className="rounded-sm">
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projects.map((p) => (
+                          <SelectItem key={p.project_id} value={p.project_id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Subject</Label>
+                    <Input
+                      data-testid="assistance-subject-input"
+                      value={assistanceForm.subject}
+                      onChange={(e) => setAssistanceForm({ ...assistanceForm, subject: e.target.value })}
+                      placeholder="Brief description of your request"
+                      required
+                      className="rounded-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Message</Label>
+                    <Textarea
+                      data-testid="assistance-message-input"
+                      value={assistanceForm.message}
+                      onChange={(e) => setAssistanceForm({ ...assistanceForm, message: e.target.value })}
+                      placeholder="Provide details about the assistance you need..."
+                      rows={4}
+                      required
+                      className="rounded-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select 
+                      value={assistanceForm.priority} 
+                      onValueChange={(v) => setAssistanceForm({ ...assistanceForm, priority: v })}
+                    >
+                      <SelectTrigger className="rounded-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="normal">Normal</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setAssistanceDialogOpen(false)} className="rounded-sm">
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-orange-500 hover:bg-orange-600 rounded-sm" data-testid="submit-assistance-btn">
+                      Submit Request
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
-        {/* Quick Stats Row */}
+        {/* Quick Stats Row - CLICKABLE */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <Card className="border border-slate-200 shadow-none rounded-sm">
+          <Card 
+            className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
+            onClick={() => navigate("/projects")}
+            data-testid="stat-active-projects"
+          >
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Active Projects</p>
               <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.active_projects || 0}</p>
+              <p className="text-xs text-orange-500 mt-1">Click to view →</p>
             </CardContent>
           </Card>
-          <Card className="border border-slate-200 shadow-none rounded-sm">
+          
+          <Card 
+            className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
+            onClick={() => navigate("/deadlines")}
+            data-testid="stat-pending-deadlines"
+          >
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Pending Deadlines</p>
               <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.pending_deadlines || 0}</p>
+              <p className="text-xs text-orange-500 mt-1">Click to view →</p>
             </CardContent>
           </Card>
-          <Card className="border border-slate-200 shadow-none rounded-sm">
+          
+          <Card 
+            className="border border-red-200 bg-red-50 shadow-none rounded-sm cursor-pointer hover:border-red-300 transition-colors"
+            onClick={() => navigate("/deadlines")}
+            data-testid="stat-overdue"
+          >
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-red-500 font-mono">Overdue</p>
               <p className="text-2xl font-mono font-bold text-red-600 mt-1">{stats?.overdue_deadlines || 0}</p>
+              <p className="text-xs text-red-500 mt-1">Click to view →</p>
             </CardContent>
           </Card>
+          
           {isLawyer && (
-            <Card className="border border-slate-200 shadow-none rounded-sm">
+            <Card 
+              className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
+              onClick={() => navigate("/notices")}
+              data-testid="stat-draft-notices"
+            >
               <CardContent className="p-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Draft Notices</p>
                 <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.draft_notices || 0}</p>
+                <p className="text-xs text-orange-500 mt-1">Click to view →</p>
               </CardContent>
             </Card>
           )}
-          <Card className="border border-slate-200 shadow-none rounded-sm">
+          
+          <Card 
+            className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
+            onClick={() => navigate("/notices")}
+            data-testid="stat-issued-notices"
+          >
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Issued Notices</p>
               <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.issued_notices || 0}</p>
+              <p className="text-xs text-orange-500 mt-1">Click to view →</p>
             </CardContent>
           </Card>
         </div>
@@ -283,7 +623,13 @@ export const DashboardPage = ({ user }) => {
           {projects.length === 0 ? (
             <Card className="border border-slate-200 shadow-none rounded-sm">
               <CardContent className="p-8 text-center">
-                <p className="text-slate-500">No projects yet</p>
+                <FolderKanban className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-500 mb-4">No projects yet</p>
+                {isLawyer && (
+                  <Button onClick={() => setProjectDialogOpen(true)} className="bg-slate-900 hover:bg-slate-800 rounded-sm">
+                    <Plus className="w-4 h-4 mr-2" /> Create First Project
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
