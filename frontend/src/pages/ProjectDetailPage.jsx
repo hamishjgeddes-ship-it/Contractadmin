@@ -31,6 +31,7 @@ import {
   FolderOpen,
   Edit,
   HelpCircle,
+  GanttChart,
 } from "lucide-react";
 import axios from "axios";
 import { API } from "../App";
@@ -183,6 +184,13 @@ export const ProjectDetailPage = ({ user }) => {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Program Button */}
+            <Link to={`/projects/${projectId}/program`}>
+              <Button className="bg-orange-500 hover:bg-orange-600 text-white rounded-sm" data-testid="view-program-btn">
+                <GanttChart className="w-4 h-4 mr-2" /> Construction Program
+              </Button>
+            </Link>
+
             {isLawyer && (
               <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                 <DialogTrigger asChild>
