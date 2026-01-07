@@ -206,6 +206,92 @@ class AssistanceRequestCreate(BaseModel):
     message: str
     priority: str = "normal"
 
+# ============ CONSTRUCTION PROGRAM MODELS ============
+
+class ProgramTask(BaseModel):
+    task_id: str = Field(default_factory=lambda: f"task_{uuid.uuid4().hex[:12]}")
+    project_id: str
+    name: str
+    description: Optional[str] = None
+    start_date: str
+    end_date: str
+    progress: int = 0  # 0-100
+    status: str = "not_started"  # not_started, in_progress, completed, delayed
+    assigned_subcontractor_id: Optional[str] = None
+    dependencies: List[str] = Field(default_factory=list)  # List of task_ids
+    color: str = "#3b82f6"  # Default blue
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ProgramTaskCreate(BaseModel):
+    project_id: str
+    name: str
+    description: Optional[str] = None
+    start_date: str
+    end_date: str
+    assigned_subcontractor_id: Optional[str] = None
+    color: str = "#3b82f6"
+
+class Subcontractor(BaseModel):
+    subcontractor_id: str = Field(default_factory=lambda: f"sub_{uuid.uuid4().hex[:12]}")
+    project_id: str
+    company_name: str
+    contact_name: str
+    email: str
+    phone: Optional[str] = None
+    trade: str  # e.g., Electrical, Plumbing, Structural
+    status: str = "pending"  # pending, invited, active, inactive
+    invited_at: Optional[datetime] = None
+    user_id: Optional[str] = None  # Linked user account when they sign up
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SubcontractorCreate(BaseModel):
+    project_id: str
+    company_name: str
+    contact_name: str
+    email: str
+    phone: Optional[str] = None
+    trade: str
+
+class Subcontract(BaseModel):
+    subcontract_id: str = Field(default_factory=lambda: f"contract_{uuid.uuid4().hex[:12]}")
+    project_id: str
+    subcontractor_id: str
+    title: str
+    contract_value: float = 0.0
+    scope_of_work: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    terms: Optional[str] = None
+    status: str = "draft"  # draft, issued, signed, terminated
+    issued_at: Optional[datetime] = None
+    signed_at: Optional[datetime] = None
+    signed_by: Optional[str] = None
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SubcontractCreate(BaseModel):
+    project_id: str
+    subcontractor_id: str
+    title: str
+    contract_value: float = 0.0
+    scope_of_work: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    terms: Optional[str] = None
+
+class ClaimTemplate(BaseModel):
+    template_id: str = Field(default_factory=lambda: f"tpl_{uuid.uuid4().hex[:12]}")
+    project_id: str
+    template_type: str  # variation, delay, extension_of_time, payment_claim
+    title: str
+    content: str
+    available_to_subcontractors: bool = True
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # ============ AUTH HELPERS ============
 
 async def get_current_user(request: Request) -> User:
