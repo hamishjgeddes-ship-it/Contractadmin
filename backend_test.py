@@ -599,6 +599,18 @@ class BuildCompliancePortalTester:
         # Project summary tests
         self.test_project_summary()
         
+        # Construction Program tests
+        self.test_get_program_tasks()
+        self.test_create_program_task()
+        self.test_update_program_task()
+        self.test_create_subcontractor()
+        self.test_list_subcontractors()
+        self.test_create_subcontract()
+        self.test_list_subcontracts()
+        self.test_issue_subcontract()
+        self.test_sign_subcontract()
+        self.test_list_claim_templates()
+        
         # Notification tests
         self.test_list_notifications()
         
