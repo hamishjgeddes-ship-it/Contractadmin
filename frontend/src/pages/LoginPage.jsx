@@ -56,7 +56,7 @@ export const LoginPage = () => {
                 </span>
               </div>
               <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-tight mb-4">
-                Contract<br />Compliance<br />Portal
+                Contract<br />Compliance
               </h1>
               <p className="text-slate-300 text-lg max-w-md">
                 Secure client portal for construction contract administration. 
