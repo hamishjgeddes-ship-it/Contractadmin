@@ -374,6 +374,192 @@ class BuildCompliancePortalTester:
         except Exception as e:
             return self.log_test("Project Summary", False, f"Error: {str(e)}")
 
+    # ============ CONSTRUCTION PROGRAM TESTS ============
+
+    def test_get_program_tasks(self):
+        """Test getting program tasks for a project"""
+        if not self.project_id:
+            return self.log_test("Get Program Tasks", False, "No project ID available")
+        
+        try:
+            response = requests.get(f"{self.api_url}/projects/{self.project_id}/program", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Count: {len(data)} tasks"
+            return self.log_test("Get Program Tasks", success, details)
+        except Exception as e:
+            return self.log_test("Get Program Tasks", False, f"Error: {str(e)}")
+
+    def test_create_program_task(self):
+        """Test creating a program task"""
+        if not self.project_id:
+            return self.log_test("Create Program Task", False, "No project ID available")
+        
+        try:
+            task_data = {
+                "project_id": self.project_id,
+                "name": "Foundation Works",
+                "description": "Excavation and concrete foundation work",
+                "start_date": "2024-02-01",
+                "end_date": "2024-02-28",
+                "color": "#3b82f6"
+            }
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/program", json=task_data, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                self.task_id = data.get('task_id')
+                details += f", Task ID: {self.task_id}"
+            return self.log_test("Create Program Task", success, details)
+        except Exception as e:
+            return self.log_test("Create Program Task", False, f"Error: {str(e)}")
+
+    def test_update_program_task(self):
+        """Test updating a program task"""
+        if not self.project_id or not self.task_id:
+            return self.log_test("Update Program Task", False, "No project ID or task ID available")
+        
+        try:
+            update_data = {"progress": 50, "status": "in_progress"}
+            response = requests.patch(f"{self.api_url}/projects/{self.project_id}/program/{self.task_id}", 
+                                    json=update_data, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            return self.log_test("Update Program Task", success, details)
+        except Exception as e:
+            return self.log_test("Update Program Task", False, f"Error: {str(e)}")
+
+    def test_create_subcontractor(self):
+        """Test creating and inviting a subcontractor"""
+        if not self.project_id:
+            return self.log_test("Create Subcontractor", False, "No project ID available")
+        
+        try:
+            subcontractor_data = {
+                "project_id": self.project_id,
+                "company_name": "ABC Electrical Services",
+                "contact_name": "John Smith",
+                "email": "john@abcelectrical.com",
+                "phone": "+61 400 123 456",
+                "trade": "Electrical"
+            }
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/subcontractors", 
+                                   json=subcontractor_data, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                self.subcontractor_id = data.get('subcontractor_id')
+                details += f", Subcontractor ID: {self.subcontractor_id}"
+            return self.log_test("Create Subcontractor", success, details)
+        except Exception as e:
+            return self.log_test("Create Subcontractor", False, f"Error: {str(e)}")
+
+    def test_list_subcontractors(self):
+        """Test listing subcontractors for a project"""
+        if not self.project_id:
+            return self.log_test("List Subcontractors", False, "No project ID available")
+        
+        try:
+            response = requests.get(f"{self.api_url}/projects/{self.project_id}/subcontractors", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Count: {len(data)} subcontractors"
+            return self.log_test("List Subcontractors", success, details)
+        except Exception as e:
+            return self.log_test("List Subcontractors", False, f"Error: {str(e)}")
+
+    def test_create_subcontract(self):
+        """Test creating a draft subcontract"""
+        if not self.project_id or not self.subcontractor_id:
+            return self.log_test("Create Subcontract", False, "No project ID or subcontractor ID available")
+        
+        try:
+            subcontract_data = {
+                "project_id": self.project_id,
+                "subcontractor_id": self.subcontractor_id,
+                "title": "Electrical Works Subcontract",
+                "contract_value": 150000.0,
+                "scope_of_work": "Complete electrical installation including power, lighting, and data systems",
+                "terms": "Standard AS4000 subcontract terms apply"
+            }
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/subcontracts", 
+                                   json=subcontract_data, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                self.subcontract_id = data.get('subcontract_id')
+                details += f", Subcontract ID: {self.subcontract_id}"
+            return self.log_test("Create Subcontract", success, details)
+        except Exception as e:
+            return self.log_test("Create Subcontract", False, f"Error: {str(e)}")
+
+    def test_list_subcontracts(self):
+        """Test listing subcontracts for a project"""
+        if not self.project_id:
+            return self.log_test("List Subcontracts", False, "No project ID available")
+        
+        try:
+            response = requests.get(f"{self.api_url}/projects/{self.project_id}/subcontracts", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Count: {len(data)} subcontracts"
+            return self.log_test("List Subcontracts", success, details)
+        except Exception as e:
+            return self.log_test("List Subcontracts", False, f"Error: {str(e)}")
+
+    def test_issue_subcontract(self):
+        """Test issuing a subcontract"""
+        if not self.project_id or not self.subcontract_id:
+            return self.log_test("Issue Subcontract", False, "No project ID or subcontract ID available")
+        
+        try:
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/subcontracts/{self.subcontract_id}/issue", 
+                                   json={}, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            return self.log_test("Issue Subcontract", success, details)
+        except Exception as e:
+            return self.log_test("Issue Subcontract", False, f"Error: {str(e)}")
+
+    def test_sign_subcontract(self):
+        """Test signing a subcontract"""
+        if not self.project_id or not self.subcontract_id:
+            return self.log_test("Sign Subcontract", False, "No project ID or subcontract ID available")
+        
+        try:
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/subcontracts/{self.subcontract_id}/sign", 
+                                   json={}, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            return self.log_test("Sign Subcontract", success, details)
+        except Exception as e:
+            return self.log_test("Sign Subcontract", False, f"Error: {str(e)}")
+
+    def test_list_claim_templates(self):
+        """Test listing claim templates for a project"""
+        if not self.project_id:
+            return self.log_test("List Claim Templates", False, "No project ID available")
+        
+        try:
+            response = requests.get(f"{self.api_url}/projects/{self.project_id}/templates", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Count: {len(data)} templates"
+            return self.log_test("List Claim Templates", success, details)
+        except Exception as e:
+            return self.log_test("List Claim Templates", False, f"Error: {str(e)}")
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚀 Starting Build Compliance Portal Backend Tests")
