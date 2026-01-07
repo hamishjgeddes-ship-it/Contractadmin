@@ -8,6 +8,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
+import { ProgramPage } from "./pages/ProgramPage";
 import { DeadlinesPage } from "./pages/DeadlinesPage";
 import { NoticesPage } from "./pages/NoticesPage";
 import { QuestionnairesPage } from "./pages/QuestionnairesPage";
@@ -145,6 +146,14 @@ function AppRouter() {
         element={
           <ProtectedRoute>
             {({ user }) => <ProjectDetailPage user={user} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:projectId/program"
+        element={
+          <ProtectedRoute>
+            {({ user }) => <ProgramPage user={user} />}
           </ProtectedRoute>
         }
       />
