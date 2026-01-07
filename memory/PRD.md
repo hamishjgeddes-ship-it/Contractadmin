@@ -31,7 +31,12 @@ A simple, secure client portal for Build Compliance that gives construction clie
 ### Backend (FastAPI)
 - ✅ Authentication via Emergent Google OAuth
 - ✅ User management with roles (admin, lawyer, client)
-- ✅ Project CRUD with value/date tracking
+- ✅ Project CRUD with extended fields:
+  - Time: start_date, original_completion_date, current_completion_date
+  - Cost: starting_value, current_value
+  - Location
+  - Stakeholders: owner, builder, subcontractors
+  - Team: client_team_members, bc_team_members
 - ✅ Deadline management with automated escalation (7/3/1 day reminders)
 - ✅ Notice workflow with status tracking
 - ✅ Questionnaire builder
@@ -40,23 +45,29 @@ A simple, secure client portal for Build Compliance that gives construction clie
 - ✅ In-app notification system
 - ✅ API integrations info endpoint
 - ✅ Dashboard statistics with overdue tracking
+- ✅ Project summary endpoint with outstanding items
 
 ### Frontend (React)
 - ✅ Login page with Build Compliance branding
 - ✅ Asana-style dashboard with:
-  - Project name, status
-  - Starting & current value (with % change)
-  - Starting & current completion dates
+  - Clickable stat cards (navigate to relevant pages)
+  - Add New Project button
+  - Project list with value/date tracking
+  - Progress bars
   - Outstanding items count
-  - Progress bar
 - ✅ Request Assistance button & dialog
-- ✅ Document Library page with upload/download
-- ✅ Integrations page showing available APIs
-- ✅ Projects with value/date fields
-- ✅ Deadlines with escalation status
-- ✅ Notices creation and issuing
-- ✅ Questionnaires builder
-- ✅ User management (admin only)
+- ✅ Project creation form with sections:
+  - Time (start date, completion date)
+  - Cost (starting value, current value)
+  - Stakeholders (owner, builder, subcontractors)
+  - Team Members (client team, BC team)
+- ✅ Project detail page mirrors dashboard:
+  - Project-specific stats (deadlines, notices, questionnaires)
+  - Value tracking with % change
+  - Timeline with progress bar
+  - Team member display
+- ✅ Document Library page
+- ✅ Integrations page
 - ✅ Quick Links sidebar
 
 ### Automated Escalation System
