@@ -23,6 +23,10 @@ class BuildCompliancePortalTester:
         self.questionnaire_id = None
         self.document_id = None
         self.assistance_request_id = None
+        # Construction Program IDs
+        self.task_id = None
+        self.subcontractor_id = None
+        self.subcontract_id = None
 
     def log_test(self, name, success, details=""):
         """Log test result"""
