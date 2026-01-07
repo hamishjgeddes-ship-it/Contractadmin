@@ -55,13 +55,22 @@ class Project(BaseModel):
     contract_type: str
     description: Optional[str] = None
     status: str = "active"  # active, completed, on_hold
-    # Value tracking
+    # Value tracking (Cost)
     starting_value: float = 0.0
     current_value: float = 0.0
-    # Date tracking
+    # Date tracking (Time)
     start_date: Optional[str] = None
     original_completion_date: Optional[str] = None
     current_completion_date: Optional[str] = None
+    # Location
+    location: Optional[str] = None
+    # Stakeholders
+    owner: Optional[str] = None
+    builder: Optional[str] = None
+    subcontractors: Optional[str] = None
+    # Team Members
+    client_team_members: Optional[str] = None
+    bc_team_members: Optional[str] = None
     # Legacy fields
     key_dates: dict = Field(default_factory=dict)
     commercial_params: dict = Field(default_factory=dict)
@@ -81,6 +90,12 @@ class ProjectCreate(BaseModel):
     start_date: Optional[str] = None
     original_completion_date: Optional[str] = None
     current_completion_date: Optional[str] = None
+    location: Optional[str] = None
+    owner: Optional[str] = None
+    builder: Optional[str] = None
+    subcontractors: Optional[str] = None
+    client_team_members: Optional[str] = None
+    bc_team_members: Optional[str] = None
 
 class Deadline(BaseModel):
     deadline_id: str = Field(default_factory=lambda: f"dl_{uuid.uuid4().hex[:12]}")
