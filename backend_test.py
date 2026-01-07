@@ -21,6 +21,8 @@ class BuildCompliancePortalTester:
         self.deadline_id = None
         self.notice_id = None
         self.questionnaire_id = None
+        self.document_id = None
+        self.assistance_request_id = None
 
     def log_test(self, name, success, details=""):
         """Log test result"""
