@@ -925,6 +925,215 @@ async def update_assistance_request(request_id: str, updates: dict, user: User =
         raise HTTPException(status_code=404, detail="Request not found")
     return {"message": "Request updated"}
 
+# ============ CONSTRUCTION PROGRAM ENDPOINTS ============
+
+@api_router.get("/projects/{project_id}/program", response_model=List[dict])
+async def get_program_tasks(project_id: str, user: User = Depends(get_current_user)):
+    """Get all program tasks for a project."""
+    # Verify access
+    project = await db.projects.find_one({"project_id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if user.role == "client" and project.get("client_email") != user.email:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    tasks = await db.program_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
+    return tasks
+
+@api_router.post("/projects/{project_id}/program", response_model=dict)
+async def create_program_task(project_id: str, task_data: ProgramTaskCreate, user: User = Depends(require_lawyer)):
+    """Create a program task."""
+    task = ProgramTask(**task_data.model_dump(), created_by=user.user_id)
+    doc = task.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.program_tasks.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+@api_router.patch("/projects/{project_id}/program/{task_id}")
+async def update_program_task(project_id: str, task_id: str, updates: dict, user: User = Depends(require_lawyer)):
+    """Update a program task."""
+    result = await db.program_tasks.update_one(
+        {"task_id": task_id, "project_id": project_id},
+        {"$set": updates}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"message": "Task updated"}
+
+@api_router.delete("/projects/{project_id}/program/{task_id}")
+async def delete_program_task(project_id: str, task_id: str, user: User = Depends(require_lawyer)):
+    """Delete a program task."""
+    result = await db.program_tasks.delete_one({"task_id": task_id, "project_id": project_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"message": "Task deleted"}
+
+# ============ SUBCONTRACTOR ENDPOINTS ============
+
+@api_router.get("/projects/{project_id}/subcontractors", response_model=List[dict])
+async def list_subcontractors(project_id: str, user: User = Depends(get_current_user)):
+    """List subcontractors for a project."""
+    subcontractors = await db.subcontractors.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
+    return subcontractors
+
+@api_router.post("/projects/{project_id}/subcontractors", response_model=dict)
+async def create_subcontractor(project_id: str, sub_data: SubcontractorCreate, user: User = Depends(require_lawyer)):
+    """Create and invite a subcontractor."""
+    subcontractor = Subcontractor(**sub_data.model_dump(), created_by=user.user_id)
+    doc = subcontractor.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.subcontractors.insert_one(doc)
+    
+    # Create user account for subcontractor (they'll be linked when they log in)
+    existing_user = await db.users.find_one({"email": sub_data.email}, {"_id": 0})
+    if not existing_user:
+        new_user = {
+            "user_id": f"user_{uuid.uuid4().hex[:12]}",
+            "email": sub_data.email,
+            "name": sub_data.contact_name,
+            "role": "subcontractor",
+            "linked_subcontractor_id": subcontractor.subcontractor_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(new_user)
+    
+    # Update status to invited
+    await db.subcontractors.update_one(
+        {"subcontractor_id": subcontractor.subcontractor_id},
+        {"$set": {"status": "invited", "invited_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+@api_router.patch("/projects/{project_id}/subcontractors/{subcontractor_id}")
+async def update_subcontractor(project_id: str, subcontractor_id: str, updates: dict, user: User = Depends(require_lawyer)):
+    """Update subcontractor details."""
+    result = await db.subcontractors.update_one(
+        {"subcontractor_id": subcontractor_id, "project_id": project_id},
+        {"$set": updates}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Subcontractor not found")
+    return {"message": "Subcontractor updated"}
+
+# ============ SUBCONTRACT ENDPOINTS ============
+
+@api_router.get("/projects/{project_id}/subcontracts", response_model=List[dict])
+async def list_subcontracts(project_id: str, user: User = Depends(get_current_user)):
+    """List subcontracts for a project."""
+    subcontracts = await db.subcontracts.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
+    return subcontracts
+
+@api_router.post("/projects/{project_id}/subcontracts", response_model=dict)
+async def create_subcontract(project_id: str, contract_data: SubcontractCreate, user: User = Depends(require_lawyer)):
+    """Create a draft subcontract."""
+    subcontract = Subcontract(**contract_data.model_dump(), created_by=user.user_id)
+    doc = subcontract.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    await db.subcontracts.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+@api_router.patch("/projects/{project_id}/subcontracts/{subcontract_id}")
+async def update_subcontract(project_id: str, subcontract_id: str, updates: dict, user: User = Depends(require_lawyer)):
+    """Update subcontract."""
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    result = await db.subcontracts.update_one(
+        {"subcontract_id": subcontract_id, "project_id": project_id},
+        {"$set": updates}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Subcontract not found")
+    return {"message": "Subcontract updated"}
+
+@api_router.post("/projects/{project_id}/subcontracts/{subcontract_id}/issue")
+async def issue_subcontract(project_id: str, subcontract_id: str, user: User = Depends(require_lawyer)):
+    """Issue a subcontract to the subcontractor."""
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.subcontracts.update_one(
+        {"subcontract_id": subcontract_id, "project_id": project_id},
+        {"$set": {"status": "issued", "issued_at": now, "updated_at": now}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Subcontract not found")
+    
+    # Notify subcontractor
+    subcontract = await db.subcontracts.find_one({"subcontract_id": subcontract_id}, {"_id": 0})
+    subcontractor = await db.subcontractors.find_one({"subcontractor_id": subcontract["subcontractor_id"]}, {"_id": 0})
+    if subcontractor:
+        sub_user = await db.users.find_one({"email": subcontractor["email"]}, {"_id": 0})
+        if sub_user:
+            await create_notification(
+                sub_user["user_id"],
+                "Subcontract Issued",
+                f"A subcontract has been issued for your review: {subcontract['title']}",
+                "notice",
+                subcontract_id
+            )
+    
+    return {"message": "Subcontract issued"}
+
+@api_router.post("/projects/{project_id}/subcontracts/{subcontract_id}/sign")
+async def sign_subcontract(project_id: str, subcontract_id: str, user: User = Depends(get_current_user)):
+    """Sign a subcontract (by subcontractor)."""
+    subcontract = await db.subcontracts.find_one({"subcontract_id": subcontract_id}, {"_id": 0})
+    if not subcontract:
+        raise HTTPException(status_code=404, detail="Subcontract not found")
+    if subcontract["status"] != "issued":
+        raise HTTPException(status_code=400, detail="Subcontract must be issued before signing")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    await db.subcontracts.update_one(
+        {"subcontract_id": subcontract_id},
+        {"$set": {"status": "signed", "signed_at": now, "signed_by": user.user_id, "updated_at": now}}
+    )
+    
+    # Update subcontractor status to active
+    await db.subcontractors.update_one(
+        {"subcontractor_id": subcontract["subcontractor_id"]},
+        {"$set": {"status": "active"}}
+    )
+    
+    # Notify lawyers
+    lawyers = await db.users.find({"role": {"$in": ["lawyer", "admin"]}}, {"_id": 0}).to_list(100)
+    for lawyer in lawyers:
+        await create_notification(
+            lawyer["user_id"],
+            "Subcontract Signed",
+            f"Subcontract '{subcontract['title']}' has been signed by {user.name}",
+            "notice",
+            subcontract_id
+        )
+    
+    return {"message": "Subcontract signed"}
+
+# ============ CLAIM TEMPLATES ENDPOINTS ============
+
+@api_router.get("/projects/{project_id}/templates", response_model=List[dict])
+async def list_claim_templates(project_id: str, user: User = Depends(get_current_user)):
+    """List claim templates for a project."""
+    query = {"project_id": project_id}
+    # Subcontractors only see templates available to them
+    if user.role == "subcontractor":
+        query["available_to_subcontractors"] = True
+    templates = await db.claim_templates.find(query, {"_id": 0}).to_list(1000)
+    return templates
+
+@api_router.post("/projects/{project_id}/templates", response_model=dict)
+async def create_claim_template(project_id: str, template_type: str, title: str, content: str, user: User = Depends(require_lawyer)):
+    """Create a claim template."""
+    template = ClaimTemplate(
+        project_id=project_id,
+        template_type=template_type,
+        title=title,
+        content=content,
+        created_by=user.user_id
+    )
+    doc = template.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.claim_templates.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
 # ============ NOTIFICATION ENDPOINTS ============
 
 async def create_notification(user_id: str, title: str, message: str, notification_type: str, reference_id: str = None):
