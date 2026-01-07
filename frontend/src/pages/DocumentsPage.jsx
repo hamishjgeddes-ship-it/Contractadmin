@@ -77,6 +77,7 @@ export const DocumentsPage = ({ user }) => {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterProject]);
 
   const handleUpload = async (e) => {
@@ -287,12 +288,12 @@ export const DocumentsPage = ({ user }) => {
               data-testid="search-documents"
             />
           </div>
-          <Select value={filterProject} onValueChange={setFilterProject}>
+          <Select value={filterProject || "all"} onValueChange={(v) => setFilterProject(v === "all" ? "" : v)}>
             <SelectTrigger className="w-48 rounded-sm">
               <SelectValue placeholder="All Projects" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Projects</SelectItem>
+              <SelectItem value="all">All Projects</SelectItem>
               {projects.map((project) => (
                 <SelectItem key={project.project_id} value={project.project_id}>
                   {project.name}
