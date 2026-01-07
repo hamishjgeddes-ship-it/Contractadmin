@@ -356,7 +356,7 @@ class BuildCompliancePortalTester:
 
     def run_all_tests(self):
         """Run all backend tests"""
-        print("🚀 Starting MLA Contract Compliance Portal Backend Tests")
+        print("🚀 Starting Build Compliance Portal Backend Tests")
         print("=" * 60)
         
         # Basic health and auth tests
@@ -379,6 +379,19 @@ class BuildCompliancePortalTester:
         # Questionnaire management tests
         self.test_create_questionnaire()
         self.test_list_questionnaires()
+        
+        # Document library tests
+        self.test_list_documents()
+        
+        # Assistance request tests
+        self.test_create_assistance_request()
+        self.test_list_assistance_requests()
+        
+        # Integration tests
+        self.test_available_integrations()
+        
+        # Project summary tests
+        self.test_project_summary()
         
         # Notification tests
         self.test_list_notifications()
