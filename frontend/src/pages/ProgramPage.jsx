@@ -454,14 +454,14 @@ export const ProgramPage = ({ user }) => {
                       <div className="space-y-2">
                         <Label>Assign Subcontractor</Label>
                         <Select
-                          value={taskForm.assigned_subcontractor_id}
-                          onValueChange={(v) => setTaskForm({ ...taskForm, assigned_subcontractor_id: v })}
+                          value={taskForm.assigned_subcontractor_id || "none"}
+                          onValueChange={(v) => setTaskForm({ ...taskForm, assigned_subcontractor_id: v === "none" ? "" : v })}
                         >
                           <SelectTrigger className="rounded-sm">
                             <SelectValue placeholder="Select subcontractor" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Unassigned</SelectItem>
+                            <SelectItem value="none">Unassigned</SelectItem>
                             {subcontractors.map((sub) => (
                               <SelectItem key={sub.subcontractor_id} value={sub.subcontractor_id}>
                                 {sub.company_name} ({sub.trade})
@@ -482,10 +482,10 @@ export const ProgramPage = ({ user }) => {
                           <SelectContent>
                             {taskColors.map((c) => (
                               <SelectItem key={c.value} value={c.value}>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.value }} />
+                                <span className="flex items-center gap-2">
+                                  <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: c.value }} />
                                   {c.label}
-                                </div>
+                                </span>
                               </SelectItem>
                             ))}
                           </SelectContent>
