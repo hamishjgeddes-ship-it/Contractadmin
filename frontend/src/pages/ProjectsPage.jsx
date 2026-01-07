@@ -21,7 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Plus, Search, FolderKanban, ArrowRight } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
+import { Calendar } from "../components/ui/calendar";
+import { Plus, Search, FolderKanban, ArrowRight, CalendarIcon } from "lucide-react";
 import axios from "axios";
 import { API } from "../App";
 import { toast } from "sonner";
@@ -33,6 +39,8 @@ export const ProjectsPage = ({ user }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [startDate, setStartDate] = useState(null);
+  const [originalCompletionDate, setOriginalCompletionDate] = useState(null);
 
   const isLawyer = user?.role === "lawyer" || user?.role === "admin";
 
@@ -42,6 +50,8 @@ export const ProjectsPage = ({ user }) => {
     client_email: "",
     contract_type: "",
     description: "",
+    starting_value: "",
+    current_value: "",
   });
 
   const fetchProjects = async () => {
@@ -64,7 +74,15 @@ export const ProjectsPage = ({ user }) => {
     e.preventDefault();
     setCreating(true);
     try {
-      await axios.post(`${API}/projects`, formData, { withCredentials: true });
+      const payload = {
+        ...formData,
+        starting_value: parseFloat(formData.starting_value) || 0,
+        current_value: parseFloat(formData.current_value) || parseFloat(formData.starting_value) || 0,
+        start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
+        original_completion_date: originalCompletionDate ? format(originalCompletionDate, "yyyy-MM-dd") : null,
+        current_completion_date: originalCompletionDate ? format(originalCompletionDate, "yyyy-MM-dd") : null,
+      };
+      await axios.post(`${API}/projects`, payload, { withCredentials: true });
       toast.success("Project created successfully");
       setDialogOpen(false);
       setFormData({
@@ -73,7 +91,11 @@ export const ProjectsPage = ({ user }) => {
         client_email: "",
         contract_type: "",
         description: "",
+        starting_value: "",
+        current_value: "",
       });
+      setStartDate(null);
+      setOriginalCompletionDate(null);
       fetchProjects();
     } catch (error) {
       console.error("Error creating project:", error);
@@ -98,6 +120,16 @@ export const ProjectsPage = ({ user }) => {
     "JCT",
     "Custom",
   ];
+
+  const formatCurrency = (value) => {
+    if (!value) return "$0";
+    return new Intl.NumberFormat('en-AU', { 
+      style: 'currency', 
+      currency: 'AUD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value);
+  };
 
   if (loading) {
     return (
@@ -133,7 +165,7 @@ export const ProjectsPage = ({ user }) => {
                   <Plus className="w-4 h-4 mr-2" /> New Project
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
+              <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
                   <DialogTitle className="font-heading">Create New Project</DialogTitle>
                 </DialogHeader>
@@ -150,6 +182,7 @@ export const ProjectsPage = ({ user }) => {
                       className="rounded-sm"
                     />
                   </div>
+                  
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="client_name">Client Name</Label>
@@ -177,6 +210,7 @@ export const ProjectsPage = ({ user }) => {
                       />
                     </div>
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="contract_type">Contract Type</Label>
                     <Select
@@ -195,6 +229,67 @@ export const ProjectsPage = ({ user }) => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Value Fields */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="starting_value">Starting Contract Value ($)</Label>
+                      <Input
+                        id="starting_value"
+                        type="number"
+                        data-testid="starting-value-input"
+                        value={formData.starting_value}
+                        onChange={(e) => setFormData({ ...formData, starting_value: e.target.value })}
+                        placeholder="0"
+                        className="rounded-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="current_value">Current Value ($)</Label>
+                      <Input
+                        id="current_value"
+                        type="number"
+                        data-testid="current-value-input"
+                        value={formData.current_value}
+                        onChange={(e) => setFormData({ ...formData, current_value: e.target.value })}
+                        placeholder="Same as starting"
+                        className="rounded-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Date Fields */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start text-left font-normal rounded-sm">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {startDate ? format(startDate, "PPP") : "Select date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Original Completion Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start text-left font-normal rounded-sm">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {originalCompletionDate ? format(originalCompletionDate, "PPP") : "Select date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={originalCompletionDate} onSelect={setOriginalCompletionDate} initialFocus />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="description">Description (Optional)</Label>
                     <Textarea
@@ -207,6 +302,7 @@ export const ProjectsPage = ({ user }) => {
                       className="rounded-sm"
                     />
                   </div>
+                  
                   <div className="flex justify-end gap-3 pt-4">
                     <Button
                       type="button"
@@ -281,8 +377,25 @@ export const ProjectsPage = ({ user }) => {
                     <h3 className="font-heading font-semibold text-slate-900 mb-1 line-clamp-1">
                       {project.name}
                     </h3>
-                    <p className="text-sm text-slate-500 mb-4">{project.client_name}</p>
-                    <div className="flex items-center justify-between text-xs text-slate-400">
+                    <p className="text-sm text-slate-500 mb-3">{project.client_name}</p>
+                    
+                    {/* Value Display */}
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-slate-500">Value:</span>
+                      <span className="font-mono font-semibold text-slate-900">
+                        {formatCurrency(project.current_value)}
+                      </span>
+                    </div>
+
+                    {/* Dates */}
+                    {project.current_completion_date && (
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span>Completion:</span>
+                        <span className="font-mono">{format(parseISO(project.current_completion_date), "dd MMM yyyy")}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between text-xs text-slate-400 mt-2 pt-2 border-t border-slate-100">
                       <span className="font-mono">{project.contract_type}</span>
                       <span>{format(parseISO(project.created_at), "dd MMM yyyy")}</span>
                     </div>

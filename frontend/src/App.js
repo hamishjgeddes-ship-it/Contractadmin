@@ -11,6 +11,8 @@ import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { DeadlinesPage } from "./pages/DeadlinesPage";
 import { NoticesPage } from "./pages/NoticesPage";
 import { QuestionnairesPage } from "./pages/QuestionnairesPage";
+import { DocumentsPage } from "./pages/DocumentsPage";
+import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { UsersPage } from "./pages/UsersPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -167,6 +169,22 @@ function AppRouter() {
         element={
           <ProtectedRoute>
             {({ user }) => <QuestionnairesPage user={user} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/documents"
+        element={
+          <ProtectedRoute>
+            {({ user }) => <DocumentsPage user={user} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/integrations"
+        element={
+          <ProtectedRoute>
+            {({ user }) => <IntegrationsPage user={user} />}
           </ProtectedRoute>
         }
       />
