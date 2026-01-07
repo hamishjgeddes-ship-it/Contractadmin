@@ -74,14 +74,25 @@ class BuildCompliancePortalTester:
             return self.log_test("Dashboard Stats", False, f"Error: {str(e)}")
 
     def test_create_project(self):
-        """Test project creation"""
+        """Test project creation with new fields"""
         try:
             project_data = {
                 "name": "Test Project - Contract Compliance",
                 "client_name": "Test Client Corp",
                 "client_email": "client@testcorp.com",
                 "contract_type": "AS4000",
-                "description": "Test project for contract compliance portal"
+                "description": "Test project for contract compliance portal",
+                "starting_value": 1000000.0,
+                "current_value": 1050000.0,
+                "start_date": "2024-01-15",
+                "original_completion_date": "2024-12-31",
+                "current_completion_date": "2025-01-15",
+                "location": "Melbourne CBD",
+                "owner": "ABC Development Corp",
+                "builder": "XYZ Construction Ltd",
+                "subcontractors": "Electrical Co\nPlumbing Co\nConcrete Co",
+                "client_team_members": "John Smith - Project Manager\nJane Doe - Site Engineer",
+                "bc_team_members": "Mike Johnson - Contract Admin\nSarah Wilson - Legal Advisor"
             }
             response = requests.post(f"{self.api_url}/projects", json=project_data, headers=self.headers, timeout=10)
             success = response.status_code == 200
@@ -90,9 +101,14 @@ class BuildCompliancePortalTester:
                 data = response.json()
                 self.project_id = data.get('project_id')
                 details += f", Project ID: {self.project_id}"
-            return self.log_test("Create Project", success, details)
+                # Verify new fields are saved
+                if data.get('location') == "Melbourne CBD" and data.get('owner') == "ABC Development Corp":
+                    details += ", New fields saved correctly"
+                else:
+                    details += ", WARNING: New fields may not be saved"
+            return self.log_test("Create Project with New Fields", success, details)
         except Exception as e:
-            return self.log_test("Create Project", False, f"Error: {str(e)}")
+            return self.log_test("Create Project with New Fields", False, f"Error: {str(e)}")
 
     def test_list_projects(self):
         """Test listing projects"""
