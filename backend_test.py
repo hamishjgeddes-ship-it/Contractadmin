@@ -418,7 +418,7 @@ class BuildCompliancePortalTester:
 
 def main():
     """Main test runner"""
-    tester = MLAPortalTester()
+    tester = BuildCompliancePortalTester()
     return tester.run_all_tests()
 
 if __name__ == "__main__":
