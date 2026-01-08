@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import axios from "axios";
@@ -7,6 +7,7 @@ import { API } from "../App";
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 export const LoginPage = () => {
   const navigate = useNavigate();
+  const [testLoading, setTestLoading] = useState(null);
 
   useEffect(() => {
     // Check if already authenticated
@@ -24,6 +25,17 @@ export const LoginPage = () => {
   const handleLogin = () => {
     const redirectUrl = window.location.origin + "/dashboard";
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  };
+
+  const handleTestLogin = async (role) => {
+    setTestLoading(role);
+    try {
+      await axios.post(`${API}/auth/test-login`, { role }, { withCredentials: true });
+      navigate("/dashboard", { replace: true });
+    } catch (error) {
+      console.error("Test login failed:", error);
+      setTestLoading(null);
+    }
   };
 
   return (
@@ -120,6 +132,45 @@ export const LoginPage = () => {
               </svg>
               Continue with Google
             </Button>
+
+            {/* Test Login Section */}
+            <div className="mt-8 pt-6 border-t border-slate-200">
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-mono mb-4 text-center">
+                Quick Test Login
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleTestLogin("admin")}
+                  disabled={testLoading !== null}
+                  className="rounded-sm text-xs h-9"
+                >
+                  {testLoading === "admin" ? "..." : "Admin"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleTestLogin("lawyer")}
+                  disabled={testLoading !== null}
+                  className="rounded-sm text-xs h-9"
+                >
+                  {testLoading === "lawyer" ? "..." : "Lawyer"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleTestLogin("client")}
+                  disabled={testLoading !== null}
+                  className="rounded-sm text-xs h-9"
+                >
+                  {testLoading === "client" ? "..." : "Client"}
+                </Button>
+              </div>
+              <p className="text-[10px] text-slate-400 text-center mt-2">
+                For testing purposes only
+              </p>
+            </div>
 
             <p className="mt-6 text-xs text-slate-400 text-center">
               By signing in, you agree to our Terms of Service and Privacy Policy
