@@ -9,8 +9,8 @@ class BuildCompliancePortalTester:
     def __init__(self, base_url="https://compliance-dash-14.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
-        self.session_token = "test_session_1767745066182"  # From MongoDB setup
-        self.user_id = "test-user-1767745066182"
+        self.session_token = "test_session_1767843667274"  # From MongoDB setup
+        self.user_id = "test-user-1767843667274"
         self.headers = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {self.session_token}'
