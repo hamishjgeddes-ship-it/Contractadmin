@@ -611,6 +611,180 @@ Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"
         except Exception as e:
             return self.log_test("CSV Program Import", False, f"Error: {str(e)}")
 
+    def test_issue_subcontract_workflow(self):
+        """Test the complete Issue Subcontract workflow from Gantt chart task actions"""
+        print("\n🔄 Testing Issue Subcontract Workflow...")
+        
+        if not self.project_id:
+            return self.log_test("Issue Subcontract Workflow", False, "No project ID available")
+        
+        workflow_success = True
+        workflow_details = []
+        
+        try:
+            # Step 1: Create a task without subcontractor assigned
+            task_data = {
+                "project_id": self.project_id,
+                "name": "Roofing Works",
+                "description": "Complete roofing installation and waterproofing",
+                "start_date": "2024-04-01",
+                "end_date": "2024-04-30",
+                "color": "#ef4444"
+            }
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/program", 
+                                   json=task_data, headers=self.headers, timeout=10)
+            
+            if response.status_code != 200:
+                workflow_success = False
+                workflow_details.append(f"Failed to create task: {response.status_code}")
+            else:
+                task_data_response = response.json()
+                unassigned_task_id = task_data_response.get('task_id')
+                workflow_details.append(f"✅ Created unassigned task: {unassigned_task_id}")
+                
+                # Step 2: Test PATCH endpoint for assigning subcontractor to task
+                # First create a subcontractor for assignment
+                subcontractor_data = {
+                    "project_id": self.project_id,
+                    "company_name": "Roofing Specialists Ltd",
+                    "contact_name": "Mike Johnson",
+                    "email": "mike@roofingspecialists.com",
+                    "phone": "+61 400 987 654",
+                    "trade": "Roofing"
+                }
+                response = requests.post(f"{self.api_url}/projects/{self.project_id}/subcontractors", 
+                                       json=subcontractor_data, headers=self.headers, timeout=10)
+                
+                if response.status_code != 200:
+                    workflow_success = False
+                    workflow_details.append(f"Failed to create subcontractor: {response.status_code}")
+                else:
+                    sub_data = response.json()
+                    new_subcontractor_id = sub_data.get('subcontractor_id')
+                    workflow_details.append(f"✅ Created subcontractor: {new_subcontractor_id}")
+                    
+                    # Step 3: Test PATCH endpoint to assign subcontractor to task
+                    assign_data = {"assigned_subcontractor_id": new_subcontractor_id}
+                    response = requests.patch(f"{self.api_url}/projects/{self.project_id}/program/{unassigned_task_id}", 
+                                            json=assign_data, headers=self.headers, timeout=10)
+                    
+                    if response.status_code != 200:
+                        workflow_success = False
+                        workflow_details.append(f"Failed to assign subcontractor to task: {response.status_code}")
+                    else:
+                        workflow_details.append("✅ Successfully assigned subcontractor to task")
+                        
+                        # Step 4: Test POST endpoint to create draft subcontract
+                        subcontract_data = {
+                            "project_id": self.project_id,
+                            "subcontractor_id": new_subcontractor_id,
+                            "title": "Roofing Works Subcontract",
+                            "contract_value": 85000.0,
+                            "scope_of_work": "Complete roofing installation including tiles, gutters, and waterproofing membrane",
+                            "start_date": "2024-04-01",
+                            "end_date": "2024-04-30",
+                            "terms": "Payment terms: 30 days net. AS4000 subcontract conditions apply."
+                        }
+                        response = requests.post(f"{self.api_url}/projects/{self.project_id}/subcontracts", 
+                                               json=subcontract_data, headers=self.headers, timeout=10)
+                        
+                        if response.status_code != 200:
+                            workflow_success = False
+                            workflow_details.append(f"Failed to create draft subcontract: {response.status_code}")
+                        else:
+                            contract_data = response.json()
+                            new_subcontract_id = contract_data.get('subcontract_id')
+                            workflow_details.append(f"✅ Created draft subcontract: {new_subcontract_id}")
+                            
+                            # Verify it's in draft status
+                            if contract_data.get('status') == 'draft':
+                                workflow_details.append("✅ Subcontract created in draft status")
+                            else:
+                                workflow_success = False
+                                workflow_details.append(f"❌ Expected draft status, got: {contract_data.get('status')}")
+                            
+                            # Step 5: Test POST endpoint to issue subcontract (draft -> issued)
+                            response = requests.post(f"{self.api_url}/projects/{self.project_id}/subcontracts/{new_subcontract_id}/issue", 
+                                                   json={}, headers=self.headers, timeout=10)
+                            
+                            if response.status_code != 200:
+                                workflow_success = False
+                                workflow_details.append(f"Failed to issue subcontract: {response.status_code}")
+                            else:
+                                workflow_details.append("✅ Successfully issued subcontract")
+                                
+                                # Verify status changed to issued
+                                response = requests.get(f"{self.api_url}/projects/{self.project_id}/subcontracts", 
+                                                      headers=self.headers, timeout=10)
+                                if response.status_code == 200:
+                                    contracts = response.json()
+                                    issued_contract = next((c for c in contracts if c['subcontract_id'] == new_subcontract_id), None)
+                                    if issued_contract and issued_contract.get('status') == 'issued':
+                                        workflow_details.append("✅ Subcontract status changed to issued")
+                                    else:
+                                        workflow_success = False
+                                        workflow_details.append(f"❌ Expected issued status, got: {issued_contract.get('status') if issued_contract else 'not found'}")
+                                
+                                # Step 6: Test POST endpoint to sign subcontract (issued -> signed)
+                                response = requests.post(f"{self.api_url}/projects/{self.project_id}/subcontracts/{new_subcontract_id}/sign", 
+                                                       json={}, headers=self.headers, timeout=10)
+                                
+                                if response.status_code != 200:
+                                    workflow_success = False
+                                    workflow_details.append(f"Failed to sign subcontract: {response.status_code}")
+                                else:
+                                    workflow_details.append("✅ Successfully signed subcontract")
+                                    
+                                    # Verify status changed to signed
+                                    response = requests.get(f"{self.api_url}/projects/{self.project_id}/subcontracts", 
+                                                          headers=self.headers, timeout=10)
+                                    if response.status_code == 200:
+                                        contracts = response.json()
+                                        signed_contract = next((c for c in contracts if c['subcontract_id'] == new_subcontract_id), None)
+                                        if signed_contract and signed_contract.get('status') == 'signed':
+                                            workflow_details.append("✅ Subcontract status changed to signed")
+                                            workflow_details.append("✅ Complete workflow: draft -> issue -> sign successful")
+                                        else:
+                                            workflow_success = False
+                                            workflow_details.append(f"❌ Expected signed status, got: {signed_contract.get('status') if signed_contract else 'not found'}")
+            
+            details = "; ".join(workflow_details)
+            return self.log_test("Issue Subcontract Workflow", workflow_success, details)
+            
+        except Exception as e:
+            return self.log_test("Issue Subcontract Workflow", False, f"Error: {str(e)}")
+
+    def test_assign_subcontractor_to_existing_task(self):
+        """Test assigning subcontractor to an existing task without subcontractor"""
+        if not self.project_id or not self.task_id or not self.subcontractor_id:
+            return self.log_test("Assign Subcontractor to Task", False, "Missing required IDs")
+        
+        try:
+            # Test the PATCH endpoint for assigning subcontractor
+            assign_data = {"assigned_subcontractor_id": self.subcontractor_id}
+            response = requests.patch(f"{self.api_url}/projects/{self.project_id}/program/{self.task_id}", 
+                                    json=assign_data, headers=self.headers, timeout=10)
+            
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            
+            if success:
+                # Verify the assignment by getting the task
+                response = requests.get(f"{self.api_url}/projects/{self.project_id}/program", 
+                                      headers=self.headers, timeout=10)
+                if response.status_code == 200:
+                    tasks = response.json()
+                    updated_task = next((t for t in tasks if t['task_id'] == self.task_id), None)
+                    if updated_task and updated_task.get('assigned_subcontractor_id') == self.subcontractor_id:
+                        details += ", Subcontractor successfully assigned"
+                    else:
+                        success = False
+                        details += ", Assignment verification failed"
+            
+            return self.log_test("Assign Subcontractor to Task", success, details)
+        except Exception as e:
+            return self.log_test("Assign Subcontractor to Task", False, f"Error: {str(e)}")
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚀 Starting Build Compliance Portal Backend Tests")
