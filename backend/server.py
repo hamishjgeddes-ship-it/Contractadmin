@@ -593,6 +593,79 @@ async def logout(request: Request, response: Response):
     response.delete_cookie(key="session_token", path="/")
     return {"message": "Logged out successfully"}
 
+# ============ TEST LOGIN (DEVELOPMENT ONLY) ============
+
+@api_router.post("/auth/test-login")
+async def test_login(request: Request, response: Response):
+    """
+    Development-only endpoint for testing the UX without Google OAuth.
+    Creates or uses a test user with the specified role.
+    """
+    body = await request.json()
+    role = body.get("role", "admin")  # admin, lawyer, or client
+    
+    if role not in ["admin", "lawyer", "client"]:
+        raise HTTPException(status_code=400, detail="Invalid role. Use: admin, lawyer, or client")
+    
+    # Test user emails by role
+    test_emails = {
+        "admin": "test-admin@buildcompliance.test",
+        "lawyer": "test-lawyer@buildcompliance.test",
+        "client": "test-client@buildcompliance.test"
+    }
+    
+    test_email = test_emails[role]
+    test_name = f"Test {role.title()} User"
+    
+    # Check if test user exists
+    existing_user = await db.users.find_one({"email": test_email}, {"_id": 0})
+    
+    if existing_user:
+        user_id = existing_user["user_id"]
+    else:
+        # Create test user
+        user_id = f"test_{role}_{uuid.uuid4().hex[:8]}"
+        new_user = {
+            "user_id": user_id,
+            "email": test_email,
+            "name": test_name,
+            "picture": None,
+            "role": role,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(new_user)
+    
+    # Create session
+    session_token = f"test_session_{uuid.uuid4().hex}"
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    
+    session_doc = {
+        "session_token": session_token,
+        "user_id": user_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": expires_at.isoformat()
+    }
+    await db.user_sessions.insert_one(session_doc)
+    
+    # Set session cookie
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        httponly=True,
+        secure=False,  # For development
+        samesite="lax",
+        max_age=7 * 24 * 60 * 60,
+        path="/"
+    )
+    
+    return {
+        "message": f"Logged in as test {role}",
+        "user_id": user_id,
+        "email": test_email,
+        "name": test_name,
+        "role": role
+    }
+
 # ============ USER MANAGEMENT ============
 
 @api_router.get("/users", response_model=List[dict])
