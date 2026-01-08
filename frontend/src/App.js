@@ -15,6 +15,7 @@ import { QuestionnairesPage } from "./pages/QuestionnairesPage";
 import { DocumentsPage } from "./pages/DocumentsPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { UsersPage } from "./pages/UsersPage";
+import { TriggerLibraryPage } from "./pages/TriggerLibraryPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
