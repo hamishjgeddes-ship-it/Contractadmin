@@ -244,6 +244,18 @@ frontend:
         agent: "testing"
         comment: "✅ Add Subcontractor dialog tested successfully. All required fields present: Company Name, Trade (dropdown with all trade options), Contact Name, Email, Phone. Dialog opens/closes properly, trade dropdown shows all available trades."
 
+  - task: "Issue Subcontract Backend APIs"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ ALL ISSUE SUBCONTRACT BACKEND APIs TESTED SUCCESSFULLY: (1) PATCH /api/projects/{project_id}/program/{task_id} for assigning subcontractors - Status 200, subcontractor successfully assigned to task ✅, (2) POST /api/projects/{project_id}/subcontracts - Status 200, creates draft subcontract correctly ✅, (3) POST /api/projects/{project_id}/subcontracts/{id}/issue - Status 200, changes status from draft to issued ✅, (4) POST /api/projects/{project_id}/subcontracts/{id}/sign - Status 200, changes status from issued to signed ✅. Complete workflow tested: Create task → Assign subcontractor → Create draft → Issue → Sign. All status transitions verified. 33/33 backend tests passed (100% success rate)."
+
   - task: "Issue Subcontract Flow"
     implemented: true
     working: true
