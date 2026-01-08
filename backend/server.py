@@ -1653,62 +1653,6 @@ async def list_clients(user: User = Depends(require_lawyer)):
 
 # ============ PROJECT STATUS CALCULATION ============
 
-@api_router.get("/projects/{project_id}/status")
-async def get_project_status(project_id: str, user: User = Depends(get_current_user)):
-    """Get calculated project status color based on events."""
-    project = await db.projects.find_one({"project_id": project_id}, {"_id": 0})
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    if user.role == "client" and project.get("client_email") != user.email:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    # Get all events for this project
-    events = await db.project_events.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
-    
-    # Get triggers for color calculation
-    trigger_ids = list(set(e.get("trigger_id") for e in events if e.get("trigger_id")))
-    triggers = await db.trigger_templates.find({"trigger_id": {"$in": trigger_ids}}, {"_id": 0}).to_list(1000)
-    trigger_map = {t["trigger_id"]: t for t in triggers}
-    
-    # Calculate overall status
-    has_red = False
-    has_orange = False
-    red_events = []
-    orange_events = []
-    
-    for event in events:
-        if event.get("status") in ["completed", "dismissed"]:
-            continue
-        trigger = trigger_map.get(event.get("trigger_id"), {})
-        color = calculate_event_status_color(event, trigger)
-        if color == "red":
-            has_red = True
-            red_events.append({"event_id": event["event_id"], "title": event["title"], "due_date": event.get("due_date")})
-        elif color == "orange":
-            has_orange = True
-            orange_events.append({"event_id": event["event_id"], "title": event["title"], "due_date": event.get("due_date")})
-    
-    overall_status = "red" if has_red else ("orange" if has_orange else "green")
-    
-    # Find next due date
-    next_due = None
-    for event in sorted(events, key=lambda x: x.get("due_date") or "9999"):
-        if event.get("due_date") and event.get("status") not in ["completed", "dismissed"]:
-            next_due = event.get("due_date")
-            break
-    
-    return {
-        "project_id": project_id,
-        "overall_status": overall_status,
-        "red_events_count": len(red_events),
-        "orange_events_count": len(orange_events),
-        "red_events": red_events[:5],  # First 5 red events
-        "orange_events": orange_events[:5],  # First 5 orange events
-        "next_due_date": next_due,
-        "total_pending_events": len([e for e in events if e.get("status") not in ["completed", "dismissed"]])
-    }
-
 @api_router.get("/projects/with-status", response_model=List[dict])
 async def list_projects_with_status(user: User = Depends(get_current_user)):
     """List all projects with their calculated status colors."""
@@ -1766,6 +1710,62 @@ async def list_projects_with_status(user: User = Depends(get_current_user)):
         project["pending_events_count"] = pending_count
     
     return projects
+
+@api_router.get("/projects/{project_id}/status")
+async def get_project_status(project_id: str, user: User = Depends(get_current_user)):
+    """Get calculated project status color based on events."""
+    project = await db.projects.find_one({"project_id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    if user.role == "client" and project.get("client_email") != user.email:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Get all events for this project
+    events = await db.project_events.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
+    
+    # Get triggers for color calculation
+    trigger_ids = list(set(e.get("trigger_id") for e in events if e.get("trigger_id")))
+    triggers = await db.trigger_templates.find({"trigger_id": {"$in": trigger_ids}}, {"_id": 0}).to_list(1000)
+    trigger_map = {t["trigger_id"]: t for t in triggers}
+    
+    # Calculate overall status
+    has_red = False
+    has_orange = False
+    red_events = []
+    orange_events = []
+    
+    for event in events:
+        if event.get("status") in ["completed", "dismissed"]:
+            continue
+        trigger = trigger_map.get(event.get("trigger_id"), {})
+        color = calculate_event_status_color(event, trigger)
+        if color == "red":
+            has_red = True
+            red_events.append({"event_id": event["event_id"], "title": event["title"], "due_date": event.get("due_date")})
+        elif color == "orange":
+            has_orange = True
+            orange_events.append({"event_id": event["event_id"], "title": event["title"], "due_date": event.get("due_date")})
+    
+    overall_status = "red" if has_red else ("orange" if has_orange else "green")
+    
+    # Find next due date
+    next_due = None
+    for event in sorted(events, key=lambda x: x.get("due_date") or "9999"):
+        if event.get("due_date") and event.get("status") not in ["completed", "dismissed"]:
+            next_due = event.get("due_date")
+            break
+    
+    return {
+        "project_id": project_id,
+        "overall_status": overall_status,
+        "red_events_count": len(red_events),
+        "orange_events_count": len(orange_events),
+        "red_events": red_events[:5],  # First 5 red events
+        "orange_events": orange_events[:5],  # First 5 orange events
+        "next_due_date": next_due,
+        "total_pending_events": len([e for e in events if e.get("status") not in ["completed", "dismissed"]])
+    }
 
 # ============ SEED DEFAULT TRIGGERS ============
 
