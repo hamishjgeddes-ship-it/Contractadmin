@@ -560,6 +560,57 @@ class BuildCompliancePortalTester:
         except Exception as e:
             return self.log_test("List Claim Templates", False, f"Error: {str(e)}")
 
+    def test_csv_program_import(self):
+        """Test CSV program import functionality"""
+        if not self.project_id:
+            return self.log_test("CSV Program Import", False, "No project ID available")
+        
+        try:
+            # Create test CSV content
+            csv_content = """task_name,start_date,end_date,subcontractor_name,subcontractor_trade,subcontractor_email
+Site Preparation,2024-03-01,2024-03-15,Ground Works Ltd,Earthworks,contact@groundworks.com
+Foundation Works,2024-03-16,2024-04-30,Concrete Solutions,Concrete,info@concretesolutions.com
+Structural Steel,2024-05-01,2024-06-15,Steel Masters,Structural,admin@steelmasters.com
+Electrical Rough-in,2024-06-01,2024-07-15,Power Systems,Electrical,jobs@powersystems.com
+Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"""
+            
+            # Create a temporary file-like object
+            import io
+            csv_file = io.BytesIO(csv_content.encode('utf-8'))
+            
+            # Prepare multipart form data
+            files = {'file': ('test_program.csv', csv_file, 'text/csv')}
+            headers_without_content_type = {k: v for k, v in self.headers.items() if k != 'Content-Type'}
+            
+            response = requests.post(
+                f"{self.api_url}/projects/{self.project_id}/program/import",
+                files=files,
+                headers=headers_without_content_type,
+                timeout=30
+            )
+            
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            
+            if success:
+                data = response.json()
+                tasks_created = data.get('tasks_created', 0)
+                subcontractors_created = data.get('subcontractors_created', 0)
+                errors = data.get('errors', [])
+                details += f", Tasks: {tasks_created}, Subcontractors: {subcontractors_created}"
+                if errors:
+                    details += f", Errors: {len(errors)}"
+            else:
+                try:
+                    error_data = response.json()
+                    details += f", Error: {error_data.get('detail', 'Unknown error')}"
+                except:
+                    details += f", Raw response: {response.text[:100]}"
+                    
+            return self.log_test("CSV Program Import", success, details)
+        except Exception as e:
+            return self.log_test("CSV Program Import", False, f"Error: {str(e)}")
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚀 Starting Build Compliance Portal Backend Tests")
