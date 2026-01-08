@@ -453,6 +453,9 @@ export const ProjectDetailPage = ({ user }) => {
           </Card>
         )}
 
+        {/* Events & Triggers Section */}
+        <ProjectEventsSection projectId={projectId} user={user} />
+
         {/* Tabs */}
         <Tabs defaultValue="deadlines" className="space-y-4">
           <TabsList className="bg-slate-100 p-1 rounded-sm">
