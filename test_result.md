@@ -263,13 +263,9 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus:
-    - "Upload Program CSV Button"
-    - "Gantt Chart Task Actions"
-    - "Add Task Dialog"
-    - "Add Subcontractor Dialog"
+  current_focus: []
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
