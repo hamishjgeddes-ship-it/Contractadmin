@@ -292,6 +292,80 @@ class ClaimTemplate(BaseModel):
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# ============ TRIGGER LIBRARY MODELS ============
+
+class TriggerTemplate(BaseModel):
+    """Trigger library - configurable triggers for project events"""
+    trigger_id: str = Field(default_factory=lambda: f"trig_{uuid.uuid4().hex[:12]}")
+    name: str  # e.g., "Delay Notice Required", "Variation Claim Due"
+    event_type: str  # delay, cost, variation, dispute, extension_of_time, payment_claim, defect, general
+    description: Optional[str] = None
+    importance: str = "medium"  # low, medium, high, critical
+    next_steps: Optional[str] = None  # Instructions for what to do
+    outcome: Optional[str] = None  # Expected outcome if not actioned
+    # Thresholds for status colors
+    days_to_orange: int = 7  # Days before due date to show orange
+    days_to_red: int = 1  # Days before due date to show red
+    # Red flag rules
+    causes_red_flag: bool = True  # Whether overdue triggers red status
+    requires_due_date: bool = True  # Events without due date won't trigger status
+    requires_value: bool = False  # Events without value won't trigger red
+    min_value_for_red: float = 0.0  # Minimum value to trigger red flag
+    # Status
+    is_active: bool = True
+    is_system: bool = False  # System triggers can't be deleted
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class TriggerTemplateCreate(BaseModel):
+    name: str
+    event_type: str
+    description: Optional[str] = None
+    importance: str = "medium"
+    next_steps: Optional[str] = None
+    outcome: Optional[str] = None
+    days_to_orange: int = 7
+    days_to_red: int = 1
+    causes_red_flag: bool = True
+    requires_due_date: bool = True
+    requires_value: bool = False
+    min_value_for_red: float = 0.0
+
+class ProjectEvent(BaseModel):
+    """Events assigned to projects, linked to triggers"""
+    event_id: str = Field(default_factory=lambda: f"evt_{uuid.uuid4().hex[:12]}")
+    project_id: str
+    trigger_id: str  # Reference to TriggerTemplate
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[str] = None  # ISO date string
+    value: Optional[float] = None  # Associated monetary value
+    status: str = "pending"  # pending, in_progress, completed, overdue, dismissed
+    # Computed status color (updated by system)
+    status_color: str = "green"  # green, orange, red
+    # Manual override
+    manual_status_override: Optional[str] = None  # lawyer can override
+    override_reason: Optional[str] = None
+    overridden_by: Optional[str] = None
+    # Completion tracking
+    completed_at: Optional[datetime] = None
+    completed_by: Optional[str] = None
+    notes: Optional[str] = None
+    # Audit
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ProjectEventCreate(BaseModel):
+    project_id: str
+    trigger_id: str
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    value: Optional[float] = None
+    notes: Optional[str] = None
+
 # ============ AUTH HELPERS ============
 
 async def get_current_user(request: Request) -> User:
