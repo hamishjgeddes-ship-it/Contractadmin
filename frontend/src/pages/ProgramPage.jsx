@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -26,6 +26,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "../components/ui/dropdown-menu";
 import { Calendar } from "../components/ui/calendar";
 import {
   Table,
@@ -53,27 +60,35 @@ import {
   UserPlus,
   Building2,
   Trash2,
-  Edit,
+  Upload,
+  MoreVertical,
+  FileUp,
+  AlertCircle,
+  Download,
 } from "lucide-react";
 import axios from "axios";
 import { API } from "../App";
 import { toast } from "sonner";
-import { format, parseISO, differenceInDays, addDays, isAfter, isBefore } from "date-fns";
+import { format, parseISO, differenceInDays, addDays } from "date-fns";
 
 export const ProgramPage = ({ user }) => {
   const { projectId } = useParams();
+  const fileInputRef = useRef(null);
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [subcontractors, setSubcontractors] = useState([]);
   const [subcontracts, setSubcontracts] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   
   // Dialogs
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [subcontractorDialogOpen, setSubcontractorDialogOpen] = useState(false);
   const [subcontractDialogOpen, setSubcontractDialogOpen] = useState(false);
+  const [noticeDialogOpen, setNoticeDialogOpen] = useState(false);
   const [selectedSubcontractor, setSelectedSubcontractor] = useState(null);
+  const [selectedTask, setSelectedTask] = useState(null);
   
   // Form states
   const [taskForm, setTaskForm] = useState({
@@ -100,6 +115,12 @@ export const ProgramPage = ({ user }) => {
     terms: "",
   });
 
+  const [noticeForm, setNoticeForm] = useState({
+    title: "",
+    notice_type: "general",
+    content: "",
+  });
+
   const isLawyer = user?.role === "lawyer" || user?.role === "admin";
 
   const trades = [
@@ -116,6 +137,15 @@ export const ProgramPage = ({ user }) => {
     { value: "#8b5cf6", label: "Purple" },
     { value: "#ec4899", label: "Pink" },
     { value: "#64748b", label: "Gray" },
+  ];
+
+  const noticeTypes = [
+    { value: "variation", label: "Variation" },
+    { value: "delay", label: "Delay Notice" },
+    { value: "extension_of_time", label: "Extension of Time" },
+    { value: "payment_claim", label: "Payment Claim" },
+    { value: "defect", label: "Defect Notice" },
+    { value: "general", label: "General Notice" },
   ];
 
   const fetchData = async () => {
@@ -144,6 +174,67 @@ export const ProgramPage = ({ user }) => {
     fetchData();
   }, [projectId]);
 
+  // File upload handler
+  const handleFileUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (!file.name.endsWith('.csv')) {
+      toast.error("Please upload a CSV file");
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await axios.post(
+        `${API}/projects/${projectId}/program/import`,
+        formData,
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+      
+      const { tasks_created, subcontractors_created, errors } = response.data;
+      
+      if (tasks_created > 0 || subcontractors_created > 0) {
+        toast.success(`Imported ${tasks_created} tasks and ${subcontractors_created} subcontractors`);
+      }
+      
+      if (errors && errors.length > 0) {
+        toast.error(`${errors.length} rows had errors`);
+        console.error("Import errors:", errors);
+      }
+      
+      fetchData();
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error(error.response?.data?.detail || "Failed to import program");
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Download template
+  const downloadTemplate = () => {
+    const csvContent = "task_name,start_date,end_date,subcontractor_name,subcontractor_trade,subcontractor_email\nFoundation Works,2025-02-01,2025-03-15,ABC Concrete,Concrete,contact@abcconcrete.com\nStructural Steel,2025-03-01,2025-04-30,Steel Fabricators Ltd,Steel,info@steelfab.com\nElectrical Rough-In,2025-04-01,2025-05-15,Sparky Electric,Electrical,sparky@electric.com";
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "program_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Task handlers
   const handleCreateTask = async (e) => {
     e.preventDefault();
@@ -157,7 +248,7 @@ export const ProgramPage = ({ user }) => {
         project_id: projectId,
         start_date: format(taskForm.start_date, "yyyy-MM-dd"),
         end_date: format(taskForm.end_date, "yyyy-MM-dd"),
-        assigned_subcontractor_id: taskForm.assigned_subcontractor_id || null,
+        assigned_subcontractor_id: taskForm.assigned_subcontractor_id === "none" ? null : taskForm.assigned_subcontractor_id || null,
       }, { withCredentials: true });
       toast.success("Task created");
       setTaskDialogOpen(false);
@@ -248,6 +339,54 @@ export const ProgramPage = ({ user }) => {
     }
   };
 
+  // Notice handler
+  const handleCreateNotice = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/notices`, {
+        project_id: projectId,
+        ...noticeForm,
+        recipient_email: selectedSubcontractor?.email || "",
+      }, { withCredentials: true });
+      toast.success("Notice created");
+      setNoticeDialogOpen(false);
+      setNoticeForm({ title: "", notice_type: "general", content: "" });
+      setSelectedSubcontractor(null);
+      setSelectedTask(null);
+    } catch (error) {
+      toast.error("Failed to create notice");
+    }
+  };
+
+  // Quick action handlers for tasks
+  const openSubcontractForTask = (task) => {
+    const sub = subcontractors.find(s => s.subcontractor_id === task.assigned_subcontractor_id);
+    if (sub) {
+      setSelectedSubcontractor(sub);
+      setSubcontractForm({
+        title: `${sub.trade} Works - ${task.name}`,
+        contract_value: "",
+        scope_of_work: `Scope for ${task.name}:\n- Work period: ${task.start_date} to ${task.end_date}`,
+        terms: "",
+      });
+      setSubcontractDialogOpen(true);
+    } else {
+      toast.error("Please assign a subcontractor to this task first");
+    }
+  };
+
+  const openNoticeForTask = (task) => {
+    const sub = subcontractors.find(s => s.subcontractor_id === task.assigned_subcontractor_id);
+    setSelectedTask(task);
+    setSelectedSubcontractor(sub || null);
+    setNoticeForm({
+      title: `Notice - ${task.name}`,
+      notice_type: "general",
+      content: `Re: ${task.name}\n\nDear ${sub?.company_name || "Contractor"},\n\n`,
+    });
+    setNoticeDialogOpen(true);
+  };
+
   // Gantt chart helpers
   const getGanttDateRange = () => {
     if (tasks.length === 0) {
@@ -276,6 +415,14 @@ export const ProgramPage = ({ user }) => {
   const getSubcontractorName = (subcontractorId) => {
     const sub = subcontractors.find(s => s.subcontractor_id === subcontractorId);
     return sub?.company_name || "Unassigned";
+  };
+
+  const getSubcontractorForTask = (task) => {
+    return subcontractors.find(s => s.subcontractor_id === task.assigned_subcontractor_id);
+  };
+
+  const getSubcontractForSubcontractor = (subcontractorId) => {
+    return subcontracts.find(c => c.subcontractor_id === subcontractorId);
   };
 
   const formatCurrency = (value) => {
@@ -321,6 +468,31 @@ export const ProgramPage = ({ user }) => {
 
           {isLawyer && (
             <div className="flex items-center gap-3">
+              {/* Upload Program */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="rounded-sm" disabled={uploading} data-testid="upload-program-btn">
+                    <Upload className="w-4 h-4 mr-2" /> {uploading ? "Uploading..." : "Upload Program"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                    <FileUp className="w-4 h-4 mr-2" /> Import from CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={downloadTemplate}>
+                    <Download className="w-4 h-4 mr-2" /> Download Template
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Dialog open={subcontractorDialogOpen} onOpenChange={setSubcontractorDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="rounded-sm" data-testid="add-subcontractor-btn">
@@ -530,26 +702,36 @@ export const ProgramPage = ({ user }) => {
           <TabsContent value="gantt">
             <Card className="border border-slate-200 shadow-none rounded-sm">
               <CardHeader className="border-b border-slate-200">
-                <CardTitle className="font-heading text-lg font-semibold">Construction Program</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="font-heading text-lg font-semibold">Construction Program</CardTitle>
+                  <p className="text-xs text-slate-500">Click progress bar to update • Use actions menu for each task</p>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {tasks.length === 0 ? (
                   <div className="p-12 text-center">
                     <Clock className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                     <p className="text-slate-500 mb-4">No tasks in the program yet</p>
-                    {isLawyer && (
-                      <Button onClick={() => setTaskDialogOpen(true)} className="bg-slate-900 hover:bg-slate-800 rounded-sm">
-                        <Plus className="w-4 h-4 mr-2" /> Add First Task
-                      </Button>
-                    )}
+                    <div className="flex items-center justify-center gap-3">
+                      {isLawyer && (
+                        <>
+                          <Button onClick={() => setTaskDialogOpen(true)} className="bg-slate-900 hover:bg-slate-800 rounded-sm">
+                            <Plus className="w-4 h-4 mr-2" /> Add Task
+                          </Button>
+                          <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="rounded-sm">
+                            <Upload className="w-4 h-4 mr-2" /> Import CSV
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     {/* Timeline Header */}
-                    <div className="min-w-[800px]">
+                    <div className="min-w-[1000px]">
                       <div className="flex border-b border-slate-200">
-                        <div className="w-64 shrink-0 p-3 border-r border-slate-200 bg-slate-50">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Task</span>
+                        <div className="w-72 shrink-0 p-3 border-r border-slate-200 bg-slate-50">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Task / Subcontractor</span>
                         </div>
                         <div className="flex-1 p-3 bg-slate-50">
                           <div className="flex justify-between text-xs font-mono text-slate-500">
@@ -558,36 +740,53 @@ export const ProgramPage = ({ user }) => {
                             <span>{format(dateRange.end, "dd MMM")}</span>
                           </div>
                         </div>
+                        <div className="w-24 shrink-0 p-3 border-l border-slate-200 bg-slate-50 text-center">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Actions</span>
+                        </div>
                       </div>
 
                       {/* Tasks */}
                       {tasks.map((task) => {
                         const pos = getTaskPosition(task, dateRange);
+                        const sub = getSubcontractorForTask(task);
+                        const existingContract = sub ? getSubcontractForSubcontractor(sub.subcontractor_id) : null;
+                        
                         return (
-                          <div key={task.task_id} className="flex border-b border-slate-100 hover:bg-slate-50" data-testid={`task-row-${task.task_id}`}>
-                            <div className="w-64 shrink-0 p-3 border-r border-slate-200">
-                              <div className="flex items-center justify-between">
+                          <div key={task.task_id} className="flex border-b border-slate-100 hover:bg-slate-50 group" data-testid={`task-row-${task.task_id}`}>
+                            {/* Task Info */}
+                            <div className="w-72 shrink-0 p-3 border-r border-slate-200">
+                              <div className="flex items-start justify-between">
                                 <div>
                                   <p className="font-medium text-slate-900 text-sm">{task.name}</p>
-                                  <p className="text-xs text-slate-500">
-                                    {task.assigned_subcontractor_id ? getSubcontractorName(task.assigned_subcontractor_id) : "Unassigned"}
-                                  </p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    {sub ? (
+                                      <Badge variant="outline" className="text-[10px] font-mono rounded-none">
+                                        {sub.company_name}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-xs text-slate-400">Unassigned</span>
+                                    )}
+                                    {existingContract && (
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`text-[10px] font-mono rounded-none
+                                          ${existingContract.status === 'signed' ? 'status-active' : ''}
+                                          ${existingContract.status === 'issued' ? 'status-issued' : ''}
+                                          ${existingContract.status === 'draft' ? 'status-draft' : ''}
+                                        `}
+                                      >
+                                        {existingContract.status}
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
-                                {isLawyer && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDeleteTask(task.task_id)}
-                                    className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                                  >
-                                    <Trash2 className="w-3 h-3 text-red-500" />
-                                  </Button>
-                                )}
                               </div>
                             </div>
+                            
+                            {/* Gantt Bar */}
                             <div className="flex-1 p-3 relative">
                               <div
-                                className="absolute h-6 rounded-sm flex items-center px-2 text-xs text-white font-medium cursor-pointer"
+                                className="absolute h-7 rounded-sm flex items-center px-2 text-xs text-white font-medium cursor-pointer transition-all hover:shadow-md"
                                 style={{
                                   backgroundColor: task.color,
                                   left: pos.left,
@@ -602,14 +801,46 @@ export const ProgramPage = ({ user }) => {
                                     handleUpdateTaskProgress(task.task_id, newProgress);
                                   }
                                 }}
-                                title={`${task.progress}% complete - Click to update`}
+                                title={`${task.progress}% complete - Click to update progress`}
                               >
                                 <div 
-                                  className="absolute left-0 top-0 bottom-0 bg-black/20 rounded-l-sm"
+                                  className="absolute left-0 top-0 bottom-0 bg-black/20 rounded-l-sm transition-all"
                                   style={{ width: `${task.progress}%` }}
                                 />
                                 <span className="relative z-10 truncate">{task.progress}%</span>
                               </div>
+                            </div>
+                            
+                            {/* Actions */}
+                            <div className="w-24 shrink-0 p-3 border-l border-slate-200 flex items-center justify-center">
+                              {isLawyer && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`task-actions-${task.task_id}`}>
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {sub && !existingContract && (
+                                      <DropdownMenuItem onClick={() => openSubcontractForTask(task)}>
+                                        <FileText className="w-4 h-4 mr-2" /> Issue Subcontract
+                                      </DropdownMenuItem>
+                                    )}
+                                    {existingContract?.status === 'draft' && (
+                                      <DropdownMenuItem onClick={() => handleIssueSubcontract(existingContract.subcontract_id)}>
+                                        <Send className="w-4 h-4 mr-2" /> Send Subcontract
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem onClick={() => openNoticeForTask(task)}>
+                                      <AlertCircle className="w-4 h-4 mr-2" /> Issue Notice
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleDeleteTask(task.task_id)} className="text-red-600">
+                                      <Trash2 className="w-4 h-4 mr-2" /> Delete Task
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
                             </div>
                           </div>
                         );
@@ -650,56 +881,85 @@ export const ProgramPage = ({ user }) => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {subcontractors.map((sub) => (
-                        <TableRow key={sub.subcontractor_id} data-testid={`subcontractor-row-${sub.subcontractor_id}`}>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
-                                <Building2 className="w-4 h-4 text-slate-600" />
+                      {subcontractors.map((sub) => {
+                        const contract = getSubcontractForSubcontractor(sub.subcontractor_id);
+                        return (
+                          <TableRow key={sub.subcontractor_id} data-testid={`subcontractor-row-${sub.subcontractor_id}`}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
+                                  <Building2 className="w-4 h-4 text-slate-600" />
+                                </div>
+                                <span className="font-medium">{sub.company_name}</span>
                               </div>
-                              <span className="font-medium">{sub.company_name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="rounded-none text-[10px] uppercase font-mono">
-                              {sub.trade}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="text-sm">{sub.contact_name}</p>
-                              <p className="text-xs text-slate-500">{sub.email}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={`rounded-none text-[10px] uppercase font-mono
-                                ${sub.status === "active" ? "status-active" : ""}
-                                ${sub.status === "invited" ? "status-issued" : ""}
-                                ${sub.status === "pending" ? "status-pending" : ""}
-                              `}
-                            >
-                              {sub.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {isLawyer && !subcontracts.find(c => c.subcontractor_id === sub.subcontractor_id) && (
-                              <Button
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="rounded-none text-[10px] uppercase font-mono">
+                                {sub.trade}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="text-sm">{sub.contact_name}</p>
+                                <p className="text-xs text-slate-500">{sub.email}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
                                 variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedSubcontractor(sub);
-                                  setSubcontractDialogOpen(true);
-                                }}
-                                className="rounded-sm text-xs"
+                                className={`rounded-none text-[10px] uppercase font-mono
+                                  ${sub.status === "active" ? "status-active" : ""}
+                                  ${sub.status === "invited" ? "status-issued" : ""}
+                                  ${sub.status === "pending" ? "status-pending" : ""}
+                                `}
                               >
-                                <FileText className="w-3 h-3 mr-1" /> Create Subcontract
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                                {sub.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {isLawyer && !contract && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedSubcontractor(sub);
+                                      setSubcontractForm({
+                                        title: `${sub.trade} Works Subcontract`,
+                                        contract_value: "",
+                                        scope_of_work: "",
+                                        terms: "",
+                                      });
+                                      setSubcontractDialogOpen(true);
+                                    }}
+                                    className="rounded-sm text-xs"
+                                  >
+                                    <FileText className="w-3 h-3 mr-1" /> Subcontract
+                                  </Button>
+                                )}
+                                {isLawyer && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedSubcontractor(sub);
+                                      setNoticeForm({
+                                        title: `Notice to ${sub.company_name}`,
+                                        notice_type: "general",
+                                        content: `Dear ${sub.company_name},\n\n`,
+                                      });
+                                      setNoticeDialogOpen(true);
+                                    }}
+                                    className="rounded-sm text-xs"
+                                  >
+                                    <AlertCircle className="w-3 h-3 mr-1" /> Notice
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 )}
@@ -718,7 +978,7 @@ export const ProgramPage = ({ user }) => {
                   <div className="p-12 text-center">
                     <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                     <p className="text-slate-500">No subcontracts created yet</p>
-                    <p className="text-xs text-slate-400 mt-1">Add subcontractors first, then create subcontracts</p>
+                    <p className="text-xs text-slate-400 mt-1">Use task actions or subcontractor actions to create subcontracts</p>
                   </div>
                 ) : (
                   <Table>
@@ -844,6 +1104,58 @@ export const ProgramPage = ({ user }) => {
               <div className="flex justify-end gap-3 pt-4">
                 <Button type="button" variant="outline" onClick={() => setSubcontractDialogOpen(false)} className="rounded-sm">Cancel</Button>
                 <Button type="submit" className="bg-slate-900 hover:bg-slate-800 rounded-sm">Create Draft</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Notice Dialog */}
+        <Dialog open={noticeDialogOpen} onOpenChange={setNoticeDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="font-heading">
+                Issue Notice {selectedSubcontractor ? `to ${selectedSubcontractor.company_name}` : ""}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCreateNotice} className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Notice Title *</Label>
+                <Input
+                  value={noticeForm.title}
+                  onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
+                  required
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Notice Type</Label>
+                <Select
+                  value={noticeForm.notice_type}
+                  onValueChange={(v) => setNoticeForm({ ...noticeForm, notice_type: v })}
+                >
+                  <SelectTrigger className="rounded-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {noticeTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Content *</Label>
+                <Textarea
+                  value={noticeForm.content}
+                  onChange={(e) => setNoticeForm({ ...noticeForm, content: e.target.value })}
+                  rows={6}
+                  required
+                  className="rounded-sm font-mono text-sm"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setNoticeDialogOpen(false)} className="rounded-sm">Cancel</Button>
+                <Button type="submit" className="bg-slate-900 hover:bg-slate-800 rounded-sm">Create Notice</Button>
               </div>
             </form>
           </DialogContent>
