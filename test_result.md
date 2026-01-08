@@ -101,3 +101,162 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Build Compliance portal - Gantt Chart Enhancement with CSV Import and Action Buttons (Issue Subcontract, Issue Notice)"
+
+backend:
+  - task: "CSV Program Import Endpoint"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint /api/projects/{project_id}/program/import exists. Handles CSV file upload, creates tasks and subcontractors. Needs testing."
+
+  - task: "Program Task CRUD APIs"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET/POST/PATCH/DELETE endpoints for program tasks exist."
+
+  - task: "Subcontractor APIs"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Subcontractor CRUD endpoints exist."
+
+  - task: "Subcontract APIs (Issue/Sign)"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Subcontract endpoints with issue and sign functionality exist."
+
+  - task: "Notice Creation API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Notice creation endpoint exists."
+
+frontend:
+  - task: "Upload Program CSV Button"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProgramPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Upload button with dropdown (Import CSV, Download Template) implemented."
+
+  - task: "Gantt Chart Task Actions"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProgramPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Each task row has Actions dropdown with Issue Subcontract, Issue Notice, Delete Task options."
+
+  - task: "Add Task Dialog"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProgramPage.jsx"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "SelectItem component error with div/span wrapper inside. Fixed by using div wrapper properly."
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed SelectItem color selector - removed span wrapper, using div with proper structure."
+
+  - task: "Add Subcontractor Dialog"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProgramPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed trade Select to use undefined instead of empty string for placeholder support."
+
+  - task: "Issue Subcontract Flow"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProgramPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Subcontract dialog and issue flow implemented."
+
+  - task: "Issue Notice Flow"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProgramPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Notice dialog with various notice types implemented."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Upload Program CSV Button"
+    - "Gantt Chart Task Actions"
+    - "Add Task Dialog"
+    - "Add Subcontractor Dialog"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Fixed SelectItem issues in ProgramPage.jsx. The color selector had a span wrapper causing Radix UI errors. Also fixed trade Select to use undefined for empty value to enable placeholder display. Ready for full Gantt chart feature testing including CSV import, task creation, and action buttons."
