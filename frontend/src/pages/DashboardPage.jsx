@@ -574,6 +574,103 @@ export const DashboardPage = ({ user }) => {
                       />
                     </div>
 
+                    {/* Trigger Templates */}
+                    {triggers.length > 0 && (
+                      <div className="border-t pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">
+                              Trigger Templates
+                            </p>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              Select triggers to track for this project
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedTriggers(triggers.map(t => t.trigger_id))}
+                              className="text-xs h-7"
+                            >
+                              Select All
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedTriggers([])}
+                              className="text-xs h-7"
+                            >
+                              Clear All
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="border rounded-sm max-h-48 overflow-y-auto">
+                          {triggers.map((trigger) => {
+                            const isSelected = selectedTriggers.includes(trigger.trigger_id);
+                            return (
+                              <div
+                                key={trigger.trigger_id}
+                                className={`flex items-start gap-3 p-3 border-b last:border-b-0 hover:bg-slate-50 cursor-pointer ${isSelected ? 'bg-slate-50' : ''}`}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedTriggers(selectedTriggers.filter(id => id !== trigger.trigger_id));
+                                  } else {
+                                    setSelectedTriggers([...selectedTriggers, trigger.trigger_id]);
+                                  }
+                                }}
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedTriggers([...selectedTriggers, trigger.trigger_id]);
+                                    } else {
+                                      setSelectedTriggers(selectedTriggers.filter(id => id !== trigger.trigger_id));
+                                    }
+                                  }}
+                                  className="mt-0.5"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium text-sm text-slate-900">{trigger.name}</p>
+                                    <Badge variant="outline" className="text-[10px] uppercase font-mono rounded-none">
+                                      {trigger.event_type}
+                                    </Badge>
+                                    {trigger.causes_red_flag && (
+                                      <span className="w-2 h-2 rounded-full bg-red-500" title="Can trigger red status" />
+                                    )}
+                                  </div>
+                                  {trigger.description && (
+                                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{trigger.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">
+                          <Zap className="w-3 h-3 inline mr-1" />
+                          {selectedTriggers.length} trigger{selectedTriggers.length !== 1 ? 's' : ''} will be added as events. You can set due dates and customize each event after project creation.
+                        </p>
+                      </div>
+                    )}
+
+                    {triggers.length === 0 && (
+                      <div className="border-t pt-4">
+                        <div className="bg-amber-50 border border-amber-200 rounded-sm p-3">
+                          <p className="text-sm text-amber-800">
+                            <AlertTriangle className="w-4 h-4 inline mr-2" />
+                            No trigger templates configured. Visit the{' '}
+                            <Link to="/triggers" className="underline font-medium">Trigger Library</Link>
+                            {' '}to set up event triggers first.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex justify-end gap-3 pt-4 border-t">
                       <Button type="button" variant="outline" onClick={() => setProjectDialogOpen(false)} className="rounded-sm">
                         Cancel
