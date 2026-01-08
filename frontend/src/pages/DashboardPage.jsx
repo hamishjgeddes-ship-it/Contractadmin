@@ -28,6 +28,20 @@ import {
   PopoverTrigger,
 } from "../components/ui/popover";
 import { Calendar } from "../components/ui/calendar";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
 import { 
   ArrowRight,
   CalendarClock,
@@ -40,7 +54,15 @@ import {
   Clock,
   Plus,
   CalendarIcon,
-  FolderKanban
+  FolderKanban,
+  Users,
+  Building2,
+  LayoutGrid,
+  LayoutList,
+  ArrowUpDown,
+  CheckCircle2,
+  AlertCircle,
+  ChevronRight,
 } from "lucide-react";
 import axios from "axios";
 import { API } from "../App";
@@ -51,6 +73,7 @@ export const DashboardPage = ({ user }) => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [assistanceDialogOpen, setAssistanceDialogOpen] = useState(false);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
@@ -58,6 +81,11 @@ export const DashboardPage = ({ user }) => {
   const [creating, setCreating] = useState(false);
   const [startDate, setStartDate] = useState(null);
   const [originalCompletionDate, setOriginalCompletionDate] = useState(null);
+  
+  // View controls
+  const [viewMode, setViewMode] = useState("list"); // "list" or "cards"
+  const [sortBy, setSortBy] = useState("status"); // "status", "client", "due_date", "name"
+  const [filterClient, setFilterClient] = useState("all");
   
   const [assistanceForm, setAssistanceForm] = useState({
     subject: "",
@@ -85,12 +113,21 @@ export const DashboardPage = ({ user }) => {
 
   const fetchData = async () => {
     try {
-      const [statsRes, projectsRes] = await Promise.all([
+      const requests = [
         axios.get(`${API}/dashboard/stats`, { withCredentials: true }),
-        axios.get(`${API}/projects`, { withCredentials: true })
-      ]);
-      setStats(statsRes.data);
-      setProjects(projectsRes.data);
+        axios.get(`${API}/projects/with-status`, { withCredentials: true })
+      ];
+      
+      if (isLawyer) {
+        requests.push(axios.get(`${API}/clients`, { withCredentials: true }));
+      }
+      
+      const results = await Promise.all(requests);
+      setStats(results[0].data);
+      setProjects(results[1].data);
+      if (isLawyer && results[2]) {
+        setClients(results[2].data);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -199,6 +236,89 @@ export const DashboardPage = ({ user }) => {
 
   const contractTypes = ["AS4000", "AS4902", "AS2124", "NEC4", "FIDIC", "JCT", "Custom"];
 
+  // Sort and filter projects
+  const getFilteredProjects = () => {
+    let filtered = [...projects];
+    
+    // Filter by client
+    if (filterClient !== "all") {
+      filtered = filtered.filter(p => p.client_name === filterClient);
+    }
+    
+    // Sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "status":
+          const statusOrder = { red: 0, orange: 1, green: 2 };
+          return (statusOrder[a.status_color] || 2) - (statusOrder[b.status_color] || 2);
+        case "client":
+          return (a.client_name || "").localeCompare(b.client_name || "");
+        case "due_date":
+          if (!a.next_due_date && !b.next_due_date) return 0;
+          if (!a.next_due_date) return 1;
+          if (!b.next_due_date) return -1;
+          return a.next_due_date.localeCompare(b.next_due_date);
+        case "name":
+          return a.name.localeCompare(b.name);
+        default:
+          return 0;
+      }
+    });
+    
+    return filtered;
+  };
+
+  const getStatusColorClasses = (color) => {
+    switch (color) {
+      case "red":
+        return "bg-red-500 border-red-500";
+      case "orange":
+        return "bg-orange-500 border-orange-500";
+      case "green":
+      default:
+        return "bg-emerald-500 border-emerald-500";
+    }
+  };
+
+  const getStatusBadgeClasses = (color) => {
+    switch (color) {
+      case "red":
+        return "border-red-200 text-red-700 bg-red-50";
+      case "orange":
+        return "border-orange-200 text-orange-700 bg-orange-50";
+      case "green":
+      default:
+        return "border-emerald-200 text-emerald-700 bg-emerald-50";
+    }
+  };
+
+  const getStatusLabel = (color) => {
+    switch (color) {
+      case "red":
+        return "Action Overdue";
+      case "orange":
+        return "Action Needed";
+      case "green":
+      default:
+        return "On Track";
+    }
+  };
+
+  const getStatusIcon = (color) => {
+    switch (color) {
+      case "red":
+        return <AlertTriangle className="w-4 h-4" />;
+      case "orange":
+        return <AlertCircle className="w-4 h-4" />;
+      case "green":
+      default:
+        return <CheckCircle2 className="w-4 h-4" />;
+    }
+  };
+
+  // Get unique client names for filter
+  const uniqueClients = [...new Set(projects.map(p => p.client_name))].filter(Boolean).sort();
+
   if (loading) {
     return (
       <Layout user={user}>
@@ -211,7 +331,7 @@ export const DashboardPage = ({ user }) => {
 
   return (
     <Layout user={user}>
-      <div className="space-y-8" data-testid="dashboard">
+      <div className="space-y-6" data-testid="dashboard">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
@@ -261,7 +381,7 @@ export const DashboardPage = ({ user }) => {
                       <div className="space-y-2">
                         <Label>Contract Type *</Label>
                         <Select
-                          value={projectForm.contract_type}
+                          value={projectForm.contract_type || undefined}
                           onValueChange={(v) => setProjectForm({ ...projectForm, contract_type: v })}
                         >
                           <SelectTrigger className="rounded-sm">
@@ -304,7 +424,7 @@ export const DashboardPage = ({ user }) => {
                           </Popover>
                         </div>
                         <div className="space-y-2">
-                          <Label>Original Completion Date</Label>
+                          <Label>Completion Date</Label>
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button variant="outline" className="w-full justify-start text-left font-normal rounded-sm">
@@ -320,12 +440,12 @@ export const DashboardPage = ({ user }) => {
                       </div>
                     </div>
 
-                    {/* Cost */}
+                    {/* Cost - Values */}
                     <div className="border-t pt-4">
                       <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono mb-3">Cost</p>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Starting Contract Value ($)</Label>
+                          <Label>Starting Value ($)</Label>
                           <Input
                             type="number"
                             value={projectForm.starting_value}
@@ -340,7 +460,35 @@ export const DashboardPage = ({ user }) => {
                             type="number"
                             value={projectForm.current_value}
                             onChange={(e) => setProjectForm({ ...projectForm, current_value: e.target.value })}
-                            placeholder="Same as starting"
+                            placeholder="0"
+                            className="rounded-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Client */}
+                    <div className="border-t pt-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono mb-3">Client</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Client Name *</Label>
+                          <Input
+                            value={projectForm.client_name}
+                            onChange={(e) => setProjectForm({ ...projectForm, client_name: e.target.value })}
+                            placeholder="Client/Company name"
+                            required
+                            className="rounded-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Client Email *</Label>
+                          <Input
+                            type="email"
+                            value={projectForm.client_email}
+                            onChange={(e) => setProjectForm({ ...projectForm, client_email: e.target.value })}
+                            placeholder="client@example.com"
+                            required
                             className="rounded-sm"
                           />
                         </div>
@@ -356,7 +504,7 @@ export const DashboardPage = ({ user }) => {
                           <Input
                             value={projectForm.owner}
                             onChange={(e) => setProjectForm({ ...projectForm, owner: e.target.value })}
-                            placeholder="Project owner/principal"
+                            placeholder="Property owner"
                             className="rounded-sm"
                           />
                         </div>
@@ -365,72 +513,7 @@ export const DashboardPage = ({ user }) => {
                           <Input
                             value={projectForm.builder}
                             onChange={(e) => setProjectForm({ ...projectForm, builder: e.target.value })}
-                            placeholder="Head contractor"
-                            className="rounded-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2 mt-4">
-                        <Label>Subcontractors</Label>
-                        <Textarea
-                          value={projectForm.subcontractors}
-                          onChange={(e) => setProjectForm({ ...projectForm, subcontractors: e.target.value })}
-                          placeholder="List key subcontractors (one per line)"
-                          rows={2}
-                          className="rounded-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Team Members */}
-                    <div className="border-t pt-4">
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono mb-3">Team Members</p>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Client Team</Label>
-                          <Textarea
-                            value={projectForm.client_team_members}
-                            onChange={(e) => setProjectForm({ ...projectForm, client_team_members: e.target.value })}
-                            placeholder="Client team members (one per line)"
-                            rows={2}
-                            className="rounded-sm"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Build Compliance Team</Label>
-                          <Textarea
-                            value={projectForm.bc_team_members}
-                            onChange={(e) => setProjectForm({ ...projectForm, bc_team_members: e.target.value })}
-                            placeholder="Assigned BC team (one per line)"
-                            rows={2}
-                            className="rounded-sm"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Client Contact */}
-                    <div className="border-t pt-4">
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono mb-3">Client Contact</p>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Client Name *</Label>
-                          <Input
-                            value={projectForm.client_name}
-                            onChange={(e) => setProjectForm({ ...projectForm, client_name: e.target.value })}
-                            placeholder="Company name"
-                            required
-                            className="rounded-sm"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Client Email *</Label>
-                          <Input
-                            type="email"
-                            value={projectForm.client_email}
-                            onChange={(e) => setProjectForm({ ...projectForm, client_email: e.target.value })}
-                            placeholder="client@company.com"
-                            required
+                            placeholder="Builder/Contractor"
                             className="rounded-sm"
                           />
                         </div>
@@ -453,7 +536,7 @@ export const DashboardPage = ({ user }) => {
                       <Button type="button" variant="outline" onClick={() => setProjectDialogOpen(false)} className="rounded-sm">
                         Cancel
                       </Button>
-                      <Button type="submit" disabled={creating} className="bg-slate-900 hover:bg-slate-800 rounded-sm" data-testid="submit-new-project">
+                      <Button type="submit" disabled={creating} className="bg-slate-900 hover:bg-slate-800 rounded-sm">
                         {creating ? "Creating..." : "Create Project"}
                       </Button>
                     </div>
@@ -479,7 +562,7 @@ export const DashboardPage = ({ user }) => {
                 <form onSubmit={handleRequestAssistance} className="space-y-4 mt-4">
                   <div className="space-y-2">
                     <Label>Project</Label>
-                    <Select value={selectedProject} onValueChange={setSelectedProject}>
+                    <Select value={selectedProject || undefined} onValueChange={setSelectedProject}>
                       <SelectTrigger data-testid="assistance-project-select" className="rounded-sm">
                         <SelectValue placeholder="Select project" />
                       </SelectTrigger>
@@ -544,206 +627,340 @@ export const DashboardPage = ({ user }) => {
           </div>
         </div>
 
-        {/* Quick Stats Row - CLICKABLE */}
+        {/* Quick Stats Row */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <Card 
             className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
             onClick={() => navigate("/projects")}
-            data-testid="stat-active-projects"
           >
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Active Projects</p>
               <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.active_projects || 0}</p>
-              <p className="text-xs text-orange-500 mt-1">Click to view →</p>
             </CardContent>
           </Card>
           
-          <Card 
-            className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
-            onClick={() => navigate("/deadlines")}
-            data-testid="stat-pending-deadlines"
-          >
+          <Card className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors">
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Pending Deadlines</p>
               <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.pending_deadlines || 0}</p>
-              <p className="text-xs text-orange-500 mt-1">Click to view →</p>
             </CardContent>
           </Card>
           
-          <Card 
-            className="border border-red-200 bg-red-50 shadow-none rounded-sm cursor-pointer hover:border-red-300 transition-colors"
-            onClick={() => navigate("/deadlines")}
-            data-testid="stat-overdue"
-          >
+          <Card className="border border-red-200 bg-red-50 shadow-none rounded-sm cursor-pointer hover:border-red-300 transition-colors">
             <CardContent className="p-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-red-500 font-mono">Overdue</p>
-              <p className="text-2xl font-mono font-bold text-red-600 mt-1">{stats?.overdue_deadlines || 0}</p>
-              <p className="text-xs text-red-500 mt-1">Click to view →</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-red-600 font-mono">Overdue</p>
+              <p className="text-2xl font-mono font-bold text-red-700 mt-1">{stats?.overdue_deadlines || 0}</p>
             </CardContent>
           </Card>
           
-          {isLawyer && (
-            <Card 
-              className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
-              onClick={() => navigate("/notices")}
-              data-testid="stat-draft-notices"
-            >
-              <CardContent className="p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Draft Notices</p>
-                <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.draft_notices || 0}</p>
-                <p className="text-xs text-orange-500 mt-1">Click to view →</p>
-              </CardContent>
-            </Card>
-          )}
+          <Card className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Draft Notices</p>
+              <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.draft_notices || 0}</p>
+            </CardContent>
+          </Card>
           
-          <Card 
-            className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
-            onClick={() => navigate("/notices")}
-            data-testid="stat-issued-notices"
-          >
+          <Card className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors">
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Issued Notices</p>
               <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.issued_notices || 0}</p>
-              <p className="text-xs text-orange-500 mt-1">Click to view →</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Projects List - Asana Style */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-heading text-lg font-semibold text-slate-900">Your Projects</h2>
-            <Link to="/projects">
-              <Button variant="ghost" size="sm" className="text-xs" data-testid="view-all-projects">
-                View All <ArrowRight className="w-3 h-3 ml-1" />
-              </Button>
-            </Link>
-          </div>
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="projects" className="space-y-4">
+          <TabsList className="bg-slate-100 p-1 rounded-sm">
+            <TabsTrigger value="projects" className="rounded-sm data-[state=active]:bg-white">
+              <FolderKanban className="w-4 h-4 mr-2" /> Projects
+            </TabsTrigger>
+            {isLawyer && (
+              <TabsTrigger value="clients" className="rounded-sm data-[state=active]:bg-white">
+                <Users className="w-4 h-4 mr-2" /> Clients ({clients.length})
+              </TabsTrigger>
+            )}
+          </TabsList>
 
-          {projects.length === 0 ? (
-            <Card className="border border-slate-200 shadow-none rounded-sm">
-              <CardContent className="p-8 text-center">
-                <FolderKanban className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500 mb-4">No projects yet</p>
-                {isLawyer && (
-                  <Button onClick={() => setProjectDialogOpen(true)} className="bg-slate-900 hover:bg-slate-800 rounded-sm">
-                    <Plus className="w-4 h-4 mr-2" /> Create First Project
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {projects.slice(0, 5).map((project) => {
-                const valueChange = getValueChange(project.starting_value, project.current_value);
-                const progress = getCompletionProgress(project);
-                return (
-                  <Link key={project.project_id} to={`/projects/${project.project_id}`} data-testid={`project-row-${project.project_id}`}>
-                    <Card className="border border-slate-200 shadow-none rounded-sm hover:border-slate-300 transition-colors">
-                      <CardContent className="p-0">
-                        <div className="grid grid-cols-12 gap-4 p-4 items-center">
-                          {/* Project Name & Status */}
-                          <div className="col-span-3">
-                            <div className="flex items-center gap-3">
-                              <Badge
-                                variant="outline"
-                                className={`
-                                  text-[10px] uppercase tracking-wider font-mono rounded-none shrink-0
-                                  ${project.status === "active" ? "status-active" : ""}
-                                  ${project.status === "completed" ? "status-completed" : ""}
-                                  ${project.status === "on_hold" ? "status-pending" : ""}
-                                `}
-                              >
-                                {project.status}
-                              </Badge>
-                              <div>
-                                <p className="font-medium text-slate-900 line-clamp-1">{project.name}</p>
-                                <p className="text-xs text-slate-500">{project.client_name}</p>
-                              </div>
-                            </div>
+          {/* Projects Tab */}
+          <TabsContent value="projects" className="space-y-4">
+            {/* Controls Row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {/* Filter by Client */}
+                <Select value={filterClient} onValueChange={setFilterClient}>
+                  <SelectTrigger className="w-48 rounded-sm">
+                    <SelectValue placeholder="All Clients" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Clients</SelectItem>
+                    {uniqueClients.map((client) => (
+                      <SelectItem key={client} value={client}>{client}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Sort */}
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-40 rounded-sm">
+                    <ArrowUpDown className="w-4 h-4 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="status">Sort by Status</SelectItem>
+                    <SelectItem value="client">Sort by Client</SelectItem>
+                    <SelectItem value="due_date">Sort by Due Date</SelectItem>
+                    <SelectItem value="name">Sort by Name</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* View Toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-sm">
+                <Button
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className="h-8 rounded-sm"
+                >
+                  <LayoutList className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "cards" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("cards")}
+                  className="h-8 rounded-sm"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Projects Display */}
+            {getFilteredProjects().length === 0 ? (
+              <Card className="border border-slate-200 shadow-none rounded-sm">
+                <CardContent className="p-8 text-center">
+                  <FolderKanban className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500 mb-4">No projects found</p>
+                  {isLawyer && (
+                    <Button onClick={() => setProjectDialogOpen(true)} className="bg-slate-900 hover:bg-slate-800 rounded-sm">
+                      <Plus className="w-4 h-4 mr-2" /> Create First Project
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : viewMode === "list" ? (
+              /* List View */
+              <Card className="border border-slate-200 shadow-none rounded-sm">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead className="font-mono text-xs uppercase">Project</TableHead>
+                      <TableHead className="font-mono text-xs uppercase">Client</TableHead>
+                      <TableHead className="font-mono text-xs uppercase">Value</TableHead>
+                      <TableHead className="font-mono text-xs uppercase">Next Due</TableHead>
+                      <TableHead className="font-mono text-xs uppercase">Status</TableHead>
+                      <TableHead className="font-mono text-xs uppercase">Actions</TableHead>
+                      <TableHead className="w-8"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getFilteredProjects().map((project) => (
+                      <TableRow 
+                        key={project.project_id}
+                        className="cursor-pointer hover:bg-slate-50"
+                        onClick={() => navigate(`/projects/${project.project_id}`)}
+                      >
+                        <TableCell>
+                          <div className={`w-3 h-3 rounded-full ${getStatusColorClasses(project.status_color)}`} />
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-slate-900">{project.name}</p>
+                            <p className="text-xs text-slate-500">{project.contract_type}</p>
                           </div>
-
-                          {/* Value */}
-                          <div className="col-span-2">
-                            <p className="text-xs text-slate-500 uppercase tracking-wider font-mono mb-1">Value</p>
-                            <div className="flex items-center gap-2">
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-slate-400" />
+                            <span className="text-sm">{project.client_name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {formatCurrency(project.current_value)}
+                        </TableCell>
+                        <TableCell>
+                          {project.next_due_date ? (
+                            <span className="text-sm font-mono">
+                              {format(parseISO(project.next_due_date), "dd MMM yyyy")}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-slate-400">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={`text-[10px] uppercase font-mono rounded-none ${getStatusBadgeClasses(project.status_color)}`}
+                          >
+                            {getStatusIcon(project.status_color)}
+                            <span className="ml-1">{getStatusLabel(project.status_color)}</span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-slate-600">
+                            {project.pending_events_count || 0} pending
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            ) : (
+              /* Cards View */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {getFilteredProjects().map((project) => {
+                  const valueChange = getValueChange(project.starting_value, project.current_value);
+                  return (
+                    <Card 
+                      key={project.project_id}
+                      className={`border-l-4 shadow-none rounded-sm cursor-pointer hover:shadow-md transition-all ${
+                        project.status_color === "red" ? "border-l-red-500" :
+                        project.status_color === "orange" ? "border-l-orange-500" :
+                        "border-l-emerald-500"
+                      }`}
+                      onClick={() => navigate(`/projects/${project.project_id}`)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <p className="font-medium text-slate-900 line-clamp-1">{project.name}</p>
+                            <p className="text-xs text-slate-500">{project.client_name}</p>
+                          </div>
+                          <Badge 
+                            variant="outline" 
+                            className={`text-[10px] uppercase font-mono rounded-none shrink-0 ${getStatusBadgeClasses(project.status_color)}`}
+                          >
+                            {getStatusLabel(project.status_color)}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 mb-3">
+                          <div>
+                            <p className="text-[10px] text-slate-500 uppercase font-mono">Value</p>
+                            <div className="flex items-center gap-1">
                               <span className="font-mono font-semibold text-slate-900">
                                 {formatCurrency(project.current_value)}
                               </span>
                               {valueChange !== 0 && (
-                                <span className={`text-xs flex items-center ${parseFloat(valueChange) > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                                  {parseFloat(valueChange) > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                                  {Math.abs(valueChange)}%
+                                <span className={`text-[10px] ${parseFloat(valueChange) > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                  {parseFloat(valueChange) > 0 ? "+" : ""}{valueChange}%
                                 </span>
                               )}
                             </div>
-                            {project.starting_value > 0 && (
-                              <p className="text-[10px] text-slate-400">from {formatCurrency(project.starting_value)}</p>
-                            )}
                           </div>
+                          <div>
+                            <p className="text-[10px] text-slate-500 uppercase font-mono">Next Due</p>
+                            <span className="font-mono text-sm text-slate-900">
+                              {project.next_due_date 
+                                ? format(parseISO(project.next_due_date), "dd MMM")
+                                : "—"
+                              }
+                            </span>
+                          </div>
+                        </div>
 
-                          {/* Dates */}
-                          <div className="col-span-2">
-                            <p className="text-xs text-slate-500 uppercase tracking-wider font-mono mb-1">Completion</p>
-                            {project.current_completion_date ? (
-                              <>
-                                <span className="font-mono text-sm text-slate-900">
-                                  {format(parseISO(project.current_completion_date), "dd MMM yyyy")}
-                                </span>
-                                {project.original_completion_date && project.original_completion_date !== project.current_completion_date && (
-                                  <p className="text-[10px] text-slate-400 line-through">
-                                    {format(parseISO(project.original_completion_date), "dd MMM yyyy")}
-                                  </p>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-sm text-slate-400">Not set</span>
-                            )}
-                          </div>
-
-                          {/* Progress */}
-                          <div className="col-span-2">
-                            <p className="text-xs text-slate-500 uppercase tracking-wider font-mono mb-1">Progress</p>
-                            <div className="flex items-center gap-2">
-                              <Progress value={progress} className="h-1.5 flex-1" />
-                              <span className="text-xs font-mono text-slate-600">{Math.round(progress)}%</span>
-                            </div>
-                          </div>
-
-                          {/* Outstanding */}
-                          <div className="col-span-2">
-                            <p className="text-xs text-slate-500 uppercase tracking-wider font-mono mb-1">Outstanding</p>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1 text-xs">
-                                <CalendarClock className="w-3 h-3 text-amber-500" />
-                                <span className="text-slate-600">{stats?.pending_deadlines || 0}</span>
-                              </div>
-                              <div className="flex items-center gap-1 text-xs">
-                                <FileText className="w-3 h-3 text-blue-500" />
-                                <span className="text-slate-600">{stats?.draft_notices || 0}</span>
-                              </div>
-                              {stats?.overdue_deadlines > 0 && (
-                                <div className="flex items-center gap-1 text-xs">
-                                  <AlertTriangle className="w-3 h-3 text-red-500" />
-                                  <span className="text-red-600">{stats?.overdue_deadlines}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Arrow */}
-                          <div className="col-span-1 flex justify-end">
-                            <ArrowRight className="w-4 h-4 text-slate-400" />
-                          </div>
+                        <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t">
+                          <span>{project.pending_events_count || 0} pending actions</span>
+                          <ArrowRight className="w-4 h-4" />
                         </div>
                       </CardContent>
                     </Card>
-                  </Link>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Clients Tab */}
+          {isLawyer && (
+            <TabsContent value="clients">
+              <Card className="border border-slate-200 shadow-none rounded-sm">
+                {clients.length === 0 ? (
+                  <CardContent className="p-8 text-center">
+                    <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-500">No clients yet. Create a project to add clients.</p>
+                  </CardContent>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="font-mono text-xs uppercase">Client</TableHead>
+                        <TableHead className="font-mono text-xs uppercase">Projects</TableHead>
+                        <TableHead className="font-mono text-xs uppercase">Active</TableHead>
+                        <TableHead className="font-mono text-xs uppercase">Action Items</TableHead>
+                        <TableHead className="font-mono text-xs uppercase">Overdue</TableHead>
+                        <TableHead className="font-mono text-xs uppercase">Total Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clients.map((client) => (
+                        <TableRow 
+                          key={client.client_name}
+                          className="cursor-pointer hover:bg-slate-50"
+                          onClick={() => setFilterClient(client.client_name)}
+                        >
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
+                                <Building2 className="w-4 h-4 text-slate-600" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-900">{client.client_name}</p>
+                                <p className="text-xs text-slate-500">{client.client_email}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-mono text-lg font-semibold">{client.project_count}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-mono">{client.active_projects}</span>
+                          </TableCell>
+                          <TableCell>
+                            {client.action_items > 0 ? (
+                              <Badge variant="outline" className="rounded-none font-mono">
+                                {client.action_items}
+                              </Badge>
+                            ) : (
+                              <span className="text-slate-400">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {client.overdue_items > 0 ? (
+                              <Badge variant="outline" className="rounded-none font-mono border-red-200 text-red-700 bg-red-50">
+                                {client.overdue_items}
+                              </Badge>
+                            ) : (
+                              <span className="text-slate-400">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-mono">
+                            {formatCurrency(client.total_value)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+            </TabsContent>
           )}
-        </div>
+        </Tabs>
 
         {/* Upcoming Deadlines & Quick Links */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -829,6 +1046,15 @@ export const DashboardPage = ({ user }) => {
                     <p className="text-xs text-slate-500">Track key dates</p>
                   </div>
                 </Link>
+                {isLawyer && (
+                  <Link to="/triggers" className="flex items-center gap-3 p-3 hover:bg-slate-50 rounded-sm">
+                    <AlertTriangle className="w-5 h-5 text-slate-400" />
+                    <div>
+                      <p className="font-medium text-sm text-slate-900">Trigger Library</p>
+                      <p className="text-xs text-slate-500">Manage event triggers</p>
+                    </div>
+                  </Link>
+                )}
               </div>
             </Card>
 
@@ -840,9 +1066,9 @@ export const DashboardPage = ({ user }) => {
                     <AlertTriangle className="w-5 h-5 text-red-500" />
                     <div>
                       <p className="font-medium text-sm text-red-800">
-                        {stats.overdue_deadlines} Overdue Deadline{stats.overdue_deadlines > 1 ? 's' : ''}
+                        {stats.overdue_deadlines} Overdue Item{stats.overdue_deadlines > 1 ? 's' : ''}
                       </p>
-                      <p className="text-xs text-red-600">Escalation notifications sent</p>
+                      <p className="text-xs text-red-600">Immediate attention required</p>
                     </div>
                   </div>
                 </CardContent>
