@@ -654,6 +654,7 @@ Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"
         self.test_get_program_tasks()
         self.test_create_program_task()
         self.test_update_program_task()
+        self.test_csv_program_import()  # Test CSV import functionality
         self.test_create_subcontractor()
         self.test_list_subcontractors()
         self.test_create_subcontract()
