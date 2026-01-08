@@ -1298,6 +1298,54 @@ Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"
             print("⚠️  Some tests failed. Check the logs above.")
             return 1
 
+    def run_enhanced_dashboard_tests_only(self):
+        """Run only the Enhanced Dashboard tests"""
+        print("🚀 Starting Enhanced Dashboard Tests")
+        print("=" * 60)
+        
+        # Basic setup
+        self.test_health_check()
+        self.test_auth_me()
+        self.test_create_project()
+        
+        # Enhanced Dashboard Tests
+        print("\n🎯 Testing Trigger Library APIs...")
+        self.test_seed_default_triggers()
+        self.test_list_triggers()
+        self.test_create_custom_trigger()
+        self.test_update_trigger()
+        self.test_get_trigger()
+        self.test_delete_system_trigger_fails()
+        
+        print("\n🎯 Testing Project Events APIs...")
+        self.test_create_project_event()
+        self.test_list_project_events()
+        self.test_status_color_scenarios()
+        self.test_update_project_event()
+        self.test_manual_status_override()
+        self.test_delete_project_event()
+        
+        print("\n🎯 Testing Dashboard APIs...")
+        self.test_list_clients()
+        self.test_projects_with_status()
+        self.test_project_status()
+        
+        print("\n🎯 Cleanup...")
+        self.test_delete_custom_trigger()
+        
+        # Print summary
+        print("=" * 60)
+        print(f"📊 Test Results: {self.tests_passed}/{self.tests_run} tests passed")
+        success_rate = (self.tests_passed / self.tests_run * 100) if self.tests_run > 0 else 0
+        print(f"📈 Success Rate: {success_rate:.1f}%")
+        
+        if self.tests_passed == self.tests_run:
+            print("🎉 All Enhanced Dashboard tests passed!")
+            return 0
+        else:
+            print("⚠️  Some Enhanced Dashboard tests failed. Check the logs above.")
+            return 1
+
     def run_issue_subcontract_tests_only(self):
         """Run only the Issue Subcontract workflow tests"""
         print("🚀 Starting Issue Subcontract Workflow Tests")
