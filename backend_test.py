@@ -1200,6 +1200,189 @@ Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"
         except Exception as e:
             return self.log_test("Assign Subcontractor to Task", False, f"Error: {str(e)}")
 
+    def test_trigger_templates_integration_with_project_creation(self):
+        """Test the complete trigger templates integration with project creation flow"""
+        print("\n🔄 Testing Trigger Templates Integration with Project Creation...")
+        
+        integration_success = True
+        integration_details = []
+        created_event_ids = []
+        
+        try:
+            # Step 1: Ensure Default Triggers Exist
+            print("Step 1: Seeding default triggers...")
+            response = requests.post(f"{self.api_url}/triggers/seed-defaults", json={}, headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                integration_details.append(f"✅ Seeded {data.get('created_count', 0)}/{data.get('total_defaults', 0)} default triggers")
+            else:
+                integration_success = False
+                integration_details.append(f"❌ Failed to seed default triggers: {response.status_code}")
+                
+            # Step 2: Verify triggers exist
+            print("Step 2: Verifying triggers exist...")
+            response = requests.get(f"{self.api_url}/triggers", headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                triggers = response.json()
+                if len(triggers) >= 5:  # Should have at least 5 default triggers
+                    integration_details.append(f"✅ Found {len(triggers)} triggers available")
+                    # Store first few triggers for testing
+                    test_triggers = triggers[:3]  # Use first 3 triggers for testing
+                else:
+                    integration_success = False
+                    integration_details.append(f"❌ Expected at least 5 triggers, found {len(triggers)}")
+                    return self.log_test("Trigger Templates Integration", integration_success, "; ".join(integration_details))
+            else:
+                integration_success = False
+                integration_details.append(f"❌ Failed to get triggers list: {response.status_code}")
+                return self.log_test("Trigger Templates Integration", integration_success, "; ".join(integration_details))
+            
+            # Step 3: Create a new project
+            print("Step 3: Creating new project...")
+            project_data = {
+                "name": "Trigger Integration Test Project",
+                "client_name": "Test Client for Triggers",
+                "client_email": "triggertest@testcorp.com",
+                "contract_type": "AS4000",
+                "description": "Test project for trigger templates integration",
+                "starting_value": 2000000.0,
+                "current_value": 2000000.0,
+                "start_date": "2024-02-01",
+                "original_completion_date": "2024-12-31",
+                "current_completion_date": "2024-12-31",
+                "location": "Sydney CBD",
+                "owner": "Test Development Corp",
+                "builder": "Test Construction Ltd"
+            }
+            response = requests.post(f"{self.api_url}/projects", json=project_data, headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                project_data_response = response.json()
+                test_project_id = project_data_response.get('project_id')
+                integration_details.append(f"✅ Created test project: {test_project_id}")
+            else:
+                integration_success = False
+                integration_details.append(f"❌ Failed to create test project: {response.status_code}")
+                return self.log_test("Trigger Templates Integration", integration_success, "; ".join(integration_details))
+            
+            # Step 4: Create events for each selected trigger
+            print("Step 4: Creating events for selected triggers...")
+            for i, trigger in enumerate(test_triggers):
+                trigger_id = trigger['trigger_id']
+                trigger_name = trigger['name']
+                
+                # Create event with different due dates to test status colors
+                days_offset = [21, 5, -2][i]  # Green, Orange, Red scenarios
+                due_date = (datetime.now() + timedelta(days=days_offset)).isoformat()
+                
+                event_data = {
+                    "project_id": test_project_id,
+                    "trigger_id": trigger_id,
+                    "title": trigger_name,
+                    "description": trigger.get('description', ''),
+                    "due_date": due_date,
+                    "value": 10000.0 * (i + 1),  # Different values for testing
+                    "notes": trigger.get('next_steps', '')
+                }
+                
+                response = requests.post(f"{self.api_url}/projects/{test_project_id}/events", 
+                                       json=event_data, headers=self.headers, timeout=10)
+                if response.status_code == 200:
+                    event_response = response.json()
+                    event_id = event_response.get('event_id')
+                    status_color = event_response.get('status_color', 'unknown')
+                    created_event_ids.append(event_id)
+                    integration_details.append(f"✅ Created event '{trigger_name}' (ID: {event_id}, Color: {status_color})")
+                else:
+                    integration_success = False
+                    integration_details.append(f"❌ Failed to create event for trigger '{trigger_name}': {response.status_code}")
+            
+            # Step 5: Verify events on project
+            print("Step 5: Verifying events on project...")
+            response = requests.get(f"{self.api_url}/projects/{test_project_id}/events", headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                events = response.json()
+                if len(events) >= len(test_triggers):
+                    integration_details.append(f"✅ Found {len(events)} events on project")
+                    
+                    # Verify each event has required fields
+                    for event in events:
+                        if all(field in event for field in ['trigger_id', 'title', 'status_color']):
+                            trigger_id = event['trigger_id']
+                            title = event['title']
+                            status_color = event['status_color']
+                            integration_details.append(f"✅ Event '{title}' has trigger_id: {trigger_id}, status_color: {status_color}")
+                        else:
+                            integration_success = False
+                            missing_fields = [f for f in ['trigger_id', 'title', 'status_color'] if f not in event]
+                            integration_details.append(f"❌ Event missing fields: {missing_fields}")
+                else:
+                    integration_success = False
+                    integration_details.append(f"❌ Expected at least {len(test_triggers)} events, found {len(events)}")
+            else:
+                integration_success = False
+                integration_details.append(f"❌ Failed to get project events: {response.status_code}")
+            
+            # Step 6: Test event customization
+            print("Step 6: Testing event customization...")
+            if created_event_ids:
+                test_event_id = created_event_ids[0]
+                
+                # Test updating due_date and value
+                custom_due_date = (datetime.now() + timedelta(days=2)).isoformat()  # Should be red
+                update_data = {
+                    "due_date": custom_due_date,
+                    "value": 25000.0,
+                    "notes": "Updated during integration testing"
+                }
+                
+                response = requests.patch(f"{self.api_url}/projects/{test_project_id}/events/{test_event_id}", 
+                                        json=update_data, headers=self.headers, timeout=10)
+                if response.status_code == 200:
+                    integration_details.append("✅ Successfully updated event with custom due_date and value")
+                    
+                    # Verify status_color changed based on new due date
+                    response = requests.get(f"{self.api_url}/projects/{test_project_id}/events", headers=self.headers, timeout=10)
+                    if response.status_code == 200:
+                        updated_events = response.json()
+                        updated_event = next((e for e in updated_events if e['event_id'] == test_event_id), None)
+                        if updated_event:
+                            new_status_color = updated_event.get('status_color')
+                            integration_details.append(f"✅ Event status_color updated to: {new_status_color} (due in 2 days)")
+                            if new_status_color in ['orange', 'red']:  # Should be orange or red for 2 days
+                                integration_details.append("✅ Status color calculation working correctly")
+                            else:
+                                integration_details.append(f"⚠️ Expected orange/red for 2 days out, got {new_status_color}")
+                        else:
+                            integration_success = False
+                            integration_details.append("❌ Could not find updated event")
+                else:
+                    integration_success = False
+                    integration_details.append(f"❌ Failed to update event: {response.status_code}")
+            
+            # Step 7: Verify project status calculation
+            print("Step 7: Verifying project status calculation...")
+            response = requests.get(f"{self.api_url}/projects/with-status", headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                projects_with_status = response.json()
+                test_project = next((p for p in projects_with_status if p['project_id'] == test_project_id), None)
+                if test_project:
+                    project_status_color = test_project.get('status_color')
+                    pending_events_count = test_project.get('pending_events_count', 0)
+                    next_due_date = test_project.get('next_due_date')
+                    integration_details.append(f"✅ Project status: {project_status_color}, Pending events: {pending_events_count}, Next due: {next_due_date}")
+                else:
+                    integration_success = False
+                    integration_details.append("❌ Test project not found in projects with status")
+            else:
+                integration_success = False
+                integration_details.append(f"❌ Failed to get projects with status: {response.status_code}")
+            
+            details = "; ".join(integration_details)
+            return self.log_test("Trigger Templates Integration with Project Creation", integration_success, details)
+            
+        except Exception as e:
+            return self.log_test("Trigger Templates Integration with Project Creation", False, f"Error: {str(e)}")
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚀 Starting Build Compliance Portal Backend Tests")
@@ -1232,6 +1415,10 @@ Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"
         self.test_project_status()
         self.test_delete_project_event()
         self.test_delete_custom_trigger()
+        
+        # Trigger Templates Integration Test (as requested)
+        print("\n🎯 Testing Trigger Templates Integration with Project Creation...")
+        self.test_trigger_templates_integration_with_project_creation()
         
         # Deadline management tests
         self.test_create_deadline()
