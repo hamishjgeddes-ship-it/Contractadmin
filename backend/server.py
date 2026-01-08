@@ -609,9 +609,9 @@ async def test_login(request: Request, response: Response):
     
     # Test user emails by role
     test_emails = {
-        "admin": "testadmin@buildcompliance.test",
-        "lawyer": "testlawyer@buildcompliance.test",
-        "client": "testclient@buildcompliance.test"
+        "admin": "admin@test.com",
+        "lawyer": "lawyer@test.com",
+        "client": "client@test.com"
     }
     
     test_email = test_emails[role]
