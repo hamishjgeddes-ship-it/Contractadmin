@@ -27,6 +27,9 @@ class BuildCompliancePortalTester:
         self.task_id = None
         self.subcontractor_id = None
         self.subcontract_id = None
+        # Enhanced Dashboard IDs
+        self.trigger_id = None
+        self.event_id = None
 
     def log_test(self, name, success, details=""):
         """Log test result"""
