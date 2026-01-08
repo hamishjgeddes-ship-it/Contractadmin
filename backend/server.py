@@ -625,6 +625,64 @@ async def list_projects(user: User = Depends(get_current_user)):
         projects = await db.projects.find({"client_email": user.email}, {"_id": 0}).to_list(1000)
     return projects
 
+@api_router.get("/projects/with-status", response_model=List[dict])
+async def list_projects_with_status(user: User = Depends(get_current_user)):
+    """List all projects with their calculated status colors."""
+    if user.role in ["lawyer", "admin"]:
+        projects = await db.projects.find({}, {"_id": 0}).to_list(1000)
+    else:
+        projects = await db.projects.find({"client_email": user.email}, {"_id": 0}).to_list(1000)
+    
+    # Get all events
+    project_ids = [p["project_id"] for p in projects]
+    all_events = await db.project_events.find(
+        {"project_id": {"$in": project_ids}}, 
+        {"_id": 0}
+    ).to_list(10000)
+    
+    # Get all triggers
+    trigger_ids = list(set(e.get("trigger_id") for e in all_events if e.get("trigger_id")))
+    triggers = await db.trigger_templates.find({"trigger_id": {"$in": trigger_ids}}, {"_id": 0}).to_list(1000)
+    trigger_map = {t["trigger_id"]: t for t in triggers}
+    
+    # Group events by project
+    events_by_project = {}
+    for event in all_events:
+        pid = event["project_id"]
+        if pid not in events_by_project:
+            events_by_project[pid] = []
+        events_by_project[pid].append(event)
+    
+    # Calculate status for each project
+    for project in projects:
+        pid = project["project_id"]
+        events = events_by_project.get(pid, [])
+        
+        has_red = False
+        has_orange = False
+        next_due = None
+        pending_count = 0
+        
+        for event in events:
+            if event.get("status") in ["completed", "dismissed"]:
+                continue
+            pending_count += 1
+            trigger = trigger_map.get(event.get("trigger_id"), {})
+            color = calculate_event_status_color(event, trigger)
+            if color == "red":
+                has_red = True
+            elif color == "orange":
+                has_orange = True
+            
+            if event.get("due_date") and (not next_due or event["due_date"] < next_due):
+                next_due = event["due_date"]
+        
+        project["status_color"] = "red" if has_red else ("orange" if has_orange else "green")
+        project["next_due_date"] = next_due
+        project["pending_events_count"] = pending_count
+    
+    return projects
+
 @api_router.post("/projects", response_model=dict)
 async def create_project(project_data: ProjectCreate, user: User = Depends(require_lawyer)):
     """Create a new project (lawyers only)."""
