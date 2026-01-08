@@ -1417,6 +1417,506 @@ async def get_dashboard_stats(user: User = Depends(get_current_user), background
         "upcoming_deadlines": upcoming_deadlines
     }
 
+# ============ TRIGGER LIBRARY ENDPOINTS ============
+
+@api_router.get("/triggers", response_model=List[dict])
+async def list_triggers(user: User = Depends(get_current_user)):
+    """List all trigger templates."""
+    triggers = await db.trigger_templates.find({"is_active": True}, {"_id": 0}).to_list(1000)
+    return triggers
+
+@api_router.post("/triggers", response_model=dict)
+async def create_trigger(trigger_data: TriggerTemplateCreate, user: User = Depends(require_lawyer)):
+    """Create a new trigger template (lawyers only)."""
+    trigger = TriggerTemplate(**trigger_data.model_dump(), created_by=user.user_id)
+    doc = trigger.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    await db.trigger_templates.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+@api_router.get("/triggers/{trigger_id}", response_model=dict)
+async def get_trigger(trigger_id: str, user: User = Depends(get_current_user)):
+    """Get a specific trigger template."""
+    trigger = await db.trigger_templates.find_one({"trigger_id": trigger_id}, {"_id": 0})
+    if not trigger:
+        raise HTTPException(status_code=404, detail="Trigger not found")
+    return trigger
+
+@api_router.patch("/triggers/{trigger_id}")
+async def update_trigger(trigger_id: str, updates: dict, user: User = Depends(require_lawyer)):
+    """Update a trigger template (lawyers only)."""
+    trigger = await db.trigger_templates.find_one({"trigger_id": trigger_id}, {"_id": 0})
+    if not trigger:
+        raise HTTPException(status_code=404, detail="Trigger not found")
+    if trigger.get("is_system"):
+        raise HTTPException(status_code=403, detail="Cannot modify system triggers")
+    
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.trigger_templates.update_one({"trigger_id": trigger_id}, {"$set": updates})
+    return {"message": "Trigger updated"}
+
+@api_router.delete("/triggers/{trigger_id}")
+async def delete_trigger(trigger_id: str, user: User = Depends(require_lawyer)):
+    """Soft delete a trigger template (lawyers only)."""
+    trigger = await db.trigger_templates.find_one({"trigger_id": trigger_id}, {"_id": 0})
+    if not trigger:
+        raise HTTPException(status_code=404, detail="Trigger not found")
+    if trigger.get("is_system"):
+        raise HTTPException(status_code=403, detail="Cannot delete system triggers")
+    
+    await db.trigger_templates.update_one({"trigger_id": trigger_id}, {"$set": {"is_active": False}})
+    return {"message": "Trigger deleted"}
+
+# ============ PROJECT EVENTS ENDPOINTS ============
+
+def calculate_event_status_color(event: dict, trigger: dict) -> str:
+    """Calculate the status color for an event based on its trigger rules."""
+    # If manually overridden, use that
+    if event.get("manual_status_override"):
+        return event["manual_status_override"]
+    
+    # If completed or dismissed, it's green
+    if event.get("status") in ["completed", "dismissed"]:
+        return "green"
+    
+    # Check if trigger causes red flag
+    if not trigger.get("causes_red_flag", True):
+        return "green"
+    
+    # Check if due date is required but missing
+    if trigger.get("requires_due_date", True) and not event.get("due_date"):
+        return "green"  # No due date, no urgency
+    
+    # Check if value is required but missing or below threshold
+    if trigger.get("requires_value", False):
+        event_value = event.get("value") or 0
+        min_value = trigger.get("min_value_for_red", 0)
+        if event_value < min_value:
+            return "green"
+    
+    # Calculate based on due date
+    if event.get("due_date"):
+        try:
+            due_date = datetime.fromisoformat(event["due_date"].replace('Z', '+00:00'))
+            if due_date.tzinfo is None:
+                due_date = due_date.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            days_until_due = (due_date - now).days
+            
+            days_to_red = trigger.get("days_to_red", 1)
+            days_to_orange = trigger.get("days_to_orange", 7)
+            
+            if days_until_due < 0:  # Overdue
+                return "red" if trigger.get("causes_red_flag", True) else "orange"
+            elif days_until_due <= days_to_red:
+                return "red"
+            elif days_until_due <= days_to_orange:
+                return "orange"
+        except:
+            pass
+    
+    return "green"
+
+@api_router.get("/projects/{project_id}/events", response_model=List[dict])
+async def list_project_events(project_id: str, user: User = Depends(get_current_user)):
+    """List all events for a project with calculated status colors."""
+    # Verify project access
+    project = await db.projects.find_one({"project_id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if user.role == "client" and project.get("client_email") != user.email:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    events = await db.project_events.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
+    
+    # Get all triggers for color calculation
+    trigger_ids = list(set(e.get("trigger_id") for e in events if e.get("trigger_id")))
+    triggers = await db.trigger_templates.find({"trigger_id": {"$in": trigger_ids}}, {"_id": 0}).to_list(1000)
+    trigger_map = {t["trigger_id"]: t for t in triggers}
+    
+    # Calculate status colors
+    for event in events:
+        trigger = trigger_map.get(event.get("trigger_id"), {})
+        event["status_color"] = calculate_event_status_color(event, trigger)
+        event["trigger_name"] = trigger.get("name", "Unknown")
+        event["trigger_event_type"] = trigger.get("event_type", "general")
+        event["trigger_importance"] = trigger.get("importance", "medium")
+    
+    return events
+
+@api_router.post("/projects/{project_id}/events", response_model=dict)
+async def create_project_event(project_id: str, event_data: ProjectEventCreate, user: User = Depends(require_lawyer)):
+    """Create a new project event (lawyers only)."""
+    # Verify project exists
+    project = await db.projects.find_one({"project_id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Verify trigger exists
+    trigger = await db.trigger_templates.find_one({"trigger_id": event_data.trigger_id}, {"_id": 0})
+    if not trigger:
+        raise HTTPException(status_code=404, detail="Trigger not found")
+    
+    event = ProjectEvent(**event_data.model_dump(), created_by=user.user_id)
+    doc = event.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    
+    # Calculate initial status color
+    doc['status_color'] = calculate_event_status_color(doc, trigger)
+    
+    await db.project_events.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+@api_router.patch("/projects/{project_id}/events/{event_id}")
+async def update_project_event(project_id: str, event_id: str, updates: dict, user: User = Depends(require_lawyer)):
+    """Update a project event (lawyers only)."""
+    event = await db.project_events.find_one({"event_id": event_id, "project_id": project_id}, {"_id": 0})
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # If completing the event
+    if updates.get("status") == "completed" and event.get("status") != "completed":
+        updates["completed_at"] = datetime.now(timezone.utc).isoformat()
+        updates["completed_by"] = user.user_id
+    
+    # If setting manual override
+    if "manual_status_override" in updates:
+        updates["overridden_by"] = user.user_id
+    
+    await db.project_events.update_one({"event_id": event_id}, {"$set": updates})
+    return {"message": "Event updated"}
+
+@api_router.delete("/projects/{project_id}/events/{event_id}")
+async def delete_project_event(project_id: str, event_id: str, user: User = Depends(require_lawyer)):
+    """Delete a project event (lawyers only)."""
+    result = await db.project_events.delete_one({"event_id": event_id, "project_id": project_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {"message": "Event deleted"}
+
+# ============ CLIENTS ENDPOINT ============
+
+@api_router.get("/clients", response_model=List[dict])
+async def list_clients(user: User = Depends(require_lawyer)):
+    """List all clients with their project counts (lawyers only)."""
+    # Aggregate clients from projects
+    pipeline = [
+        {"$group": {
+            "_id": "$client_name",
+            "client_email": {"$first": "$client_email"},
+            "project_count": {"$sum": 1},
+            "active_projects": {"$sum": {"$cond": [{"$eq": ["$status", "active"]}, 1, 0]}},
+            "total_value": {"$sum": "$current_value"}
+        }},
+        {"$project": {
+            "_id": 0,
+            "client_name": "$_id",
+            "client_email": 1,
+            "project_count": 1,
+            "active_projects": 1,
+            "total_value": 1
+        }},
+        {"$sort": {"client_name": 1}}
+    ]
+    
+    clients = await db.projects.aggregate(pipeline).to_list(1000)
+    
+    # Get action items count per client
+    for client in clients:
+        # Get all projects for this client
+        client_projects = await db.projects.find(
+            {"client_name": client["client_name"]}, 
+            {"project_id": 1, "_id": 0}
+        ).to_list(1000)
+        project_ids = [p["project_id"] for p in client_projects]
+        
+        # Count pending events (action items)
+        action_items = await db.project_events.count_documents({
+            "project_id": {"$in": project_ids},
+            "status": {"$in": ["pending", "in_progress"]}
+        })
+        
+        # Count overdue events
+        overdue_items = await db.project_events.count_documents({
+            "project_id": {"$in": project_ids},
+            "status_color": "red"
+        })
+        
+        client["action_items"] = action_items
+        client["overdue_items"] = overdue_items
+    
+    return clients
+
+# ============ PROJECT STATUS CALCULATION ============
+
+@api_router.get("/projects/{project_id}/status")
+async def get_project_status(project_id: str, user: User = Depends(get_current_user)):
+    """Get calculated project status color based on events."""
+    project = await db.projects.find_one({"project_id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    if user.role == "client" and project.get("client_email") != user.email:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Get all events for this project
+    events = await db.project_events.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
+    
+    # Get triggers for color calculation
+    trigger_ids = list(set(e.get("trigger_id") for e in events if e.get("trigger_id")))
+    triggers = await db.trigger_templates.find({"trigger_id": {"$in": trigger_ids}}, {"_id": 0}).to_list(1000)
+    trigger_map = {t["trigger_id"]: t for t in triggers}
+    
+    # Calculate overall status
+    has_red = False
+    has_orange = False
+    red_events = []
+    orange_events = []
+    
+    for event in events:
+        if event.get("status") in ["completed", "dismissed"]:
+            continue
+        trigger = trigger_map.get(event.get("trigger_id"), {})
+        color = calculate_event_status_color(event, trigger)
+        if color == "red":
+            has_red = True
+            red_events.append({"event_id": event["event_id"], "title": event["title"], "due_date": event.get("due_date")})
+        elif color == "orange":
+            has_orange = True
+            orange_events.append({"event_id": event["event_id"], "title": event["title"], "due_date": event.get("due_date")})
+    
+    overall_status = "red" if has_red else ("orange" if has_orange else "green")
+    
+    # Find next due date
+    next_due = None
+    for event in sorted(events, key=lambda x: x.get("due_date") or "9999"):
+        if event.get("due_date") and event.get("status") not in ["completed", "dismissed"]:
+            next_due = event.get("due_date")
+            break
+    
+    return {
+        "project_id": project_id,
+        "overall_status": overall_status,
+        "red_events_count": len(red_events),
+        "orange_events_count": len(orange_events),
+        "red_events": red_events[:5],  # First 5 red events
+        "orange_events": orange_events[:5],  # First 5 orange events
+        "next_due_date": next_due,
+        "total_pending_events": len([e for e in events if e.get("status") not in ["completed", "dismissed"]])
+    }
+
+@api_router.get("/projects/with-status", response_model=List[dict])
+async def list_projects_with_status(user: User = Depends(get_current_user)):
+    """List all projects with their calculated status colors."""
+    if user.role in ["lawyer", "admin"]:
+        projects = await db.projects.find({}, {"_id": 0}).to_list(1000)
+    else:
+        projects = await db.projects.find({"client_email": user.email}, {"_id": 0}).to_list(1000)
+    
+    # Get all events
+    project_ids = [p["project_id"] for p in projects]
+    all_events = await db.project_events.find(
+        {"project_id": {"$in": project_ids}}, 
+        {"_id": 0}
+    ).to_list(10000)
+    
+    # Get all triggers
+    trigger_ids = list(set(e.get("trigger_id") for e in all_events if e.get("trigger_id")))
+    triggers = await db.trigger_templates.find({"trigger_id": {"$in": trigger_ids}}, {"_id": 0}).to_list(1000)
+    trigger_map = {t["trigger_id"]: t for t in triggers}
+    
+    # Group events by project
+    events_by_project = {}
+    for event in all_events:
+        pid = event["project_id"]
+        if pid not in events_by_project:
+            events_by_project[pid] = []
+        events_by_project[pid].append(event)
+    
+    # Calculate status for each project
+    for project in projects:
+        pid = project["project_id"]
+        events = events_by_project.get(pid, [])
+        
+        has_red = False
+        has_orange = False
+        next_due = None
+        pending_count = 0
+        
+        for event in events:
+            if event.get("status") in ["completed", "dismissed"]:
+                continue
+            pending_count += 1
+            trigger = trigger_map.get(event.get("trigger_id"), {})
+            color = calculate_event_status_color(event, trigger)
+            if color == "red":
+                has_red = True
+            elif color == "orange":
+                has_orange = True
+            
+            if event.get("due_date") and (not next_due or event["due_date"] < next_due):
+                next_due = event["due_date"]
+        
+        project["status_color"] = "red" if has_red else ("orange" if has_orange else "green")
+        project["next_due_date"] = next_due
+        project["pending_events_count"] = pending_count
+    
+    return projects
+
+# ============ SEED DEFAULT TRIGGERS ============
+
+@api_router.post("/triggers/seed-defaults")
+async def seed_default_triggers(user: User = Depends(require_lawyer)):
+    """Seed the trigger library with default construction triggers."""
+    default_triggers = [
+        {
+            "name": "Delay Notice Required",
+            "event_type": "delay",
+            "description": "Notice must be given for delay claim entitlement",
+            "importance": "critical",
+            "next_steps": "Prepare and issue delay notice to principal/contractor",
+            "outcome": "Entitlement to extension of time and/or delay costs may be lost",
+            "days_to_orange": 7,
+            "days_to_red": 1,
+            "causes_red_flag": True,
+            "requires_due_date": True,
+            "requires_value": False,
+            "is_system": True
+        },
+        {
+            "name": "Variation Claim Due",
+            "event_type": "variation",
+            "description": "Variation claim must be submitted",
+            "importance": "critical",
+            "next_steps": "Prepare and submit variation claim with supporting documentation",
+            "outcome": "Entitlement to variation payment may be barred",
+            "days_to_orange": 14,
+            "days_to_red": 3,
+            "causes_red_flag": True,
+            "requires_due_date": True,
+            "requires_value": True,
+            "min_value_for_red": 1000,
+            "is_system": True
+        },
+        {
+            "name": "Extension of Time Claim",
+            "event_type": "extension_of_time",
+            "description": "EOT claim must be submitted",
+            "importance": "critical",
+            "next_steps": "Prepare EOT claim with delay analysis",
+            "outcome": "Liquidated damages may apply",
+            "days_to_orange": 14,
+            "days_to_red": 3,
+            "causes_red_flag": True,
+            "requires_due_date": True,
+            "requires_value": False,
+            "is_system": True
+        },
+        {
+            "name": "Payment Claim Due",
+            "event_type": "payment_claim",
+            "description": "Progress payment claim submission deadline",
+            "importance": "high",
+            "next_steps": "Prepare and submit payment claim",
+            "outcome": "Delayed payment for work completed",
+            "days_to_orange": 7,
+            "days_to_red": 2,
+            "causes_red_flag": True,
+            "requires_due_date": True,
+            "requires_value": True,
+            "min_value_for_red": 5000,
+            "is_system": True
+        },
+        {
+            "name": "Defect Notice Response",
+            "event_type": "defect",
+            "description": "Response to defect notice required",
+            "importance": "high",
+            "next_steps": "Review defect notice and prepare response",
+            "outcome": "May be deemed to accept defect allegation",
+            "days_to_orange": 7,
+            "days_to_red": 2,
+            "causes_red_flag": True,
+            "requires_due_date": True,
+            "requires_value": False,
+            "is_system": True
+        },
+        {
+            "name": "Dispute Notice",
+            "event_type": "dispute",
+            "description": "Formal dispute notice required",
+            "importance": "critical",
+            "next_steps": "Prepare and issue dispute notice",
+            "outcome": "Right to dispute may be waived",
+            "days_to_orange": 14,
+            "days_to_red": 3,
+            "causes_red_flag": True,
+            "requires_due_date": True,
+            "requires_value": False,
+            "is_system": True
+        },
+        {
+            "name": "Internal Review",
+            "event_type": "general",
+            "description": "Internal document review or check",
+            "importance": "low",
+            "next_steps": "Complete internal review",
+            "outcome": "Administrative task only",
+            "days_to_orange": 7,
+            "days_to_red": 1,
+            "causes_red_flag": False,  # Does NOT cause red flag
+            "requires_due_date": False,
+            "requires_value": False,
+            "is_system": True
+        },
+        {
+            "name": "Meeting/Site Visit",
+            "event_type": "general",
+            "description": "Scheduled meeting or site visit",
+            "importance": "medium",
+            "next_steps": "Attend meeting or site visit",
+            "outcome": "N/A",
+            "days_to_orange": 3,
+            "days_to_red": 1,
+            "causes_red_flag": False,  # Does NOT cause red flag
+            "requires_due_date": True,
+            "requires_value": False,
+            "is_system": True
+        },
+        {
+            "name": "Latent Condition Notice",
+            "event_type": "cost",
+            "description": "Notice for latent condition claim",
+            "importance": "critical",
+            "next_steps": "Document latent condition and issue notice",
+            "outcome": "Entitlement to additional costs may be lost",
+            "days_to_orange": 5,
+            "days_to_red": 1,
+            "causes_red_flag": True,
+            "requires_due_date": True,
+            "requires_value": False,
+            "is_system": True
+        }
+    ]
+    
+    created_count = 0
+    for trigger_data in default_triggers:
+        # Check if trigger already exists
+        existing = await db.trigger_templates.find_one({"name": trigger_data["name"], "is_system": True})
+        if not existing:
+            trigger = TriggerTemplate(**trigger_data, created_by=user.user_id)
+            doc = trigger.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            doc['updated_at'] = doc['updated_at'].isoformat()
+            await db.trigger_templates.insert_one(doc)
+            created_count += 1
+    
+    return {"message": f"Created {created_count} default triggers", "total_defaults": len(default_triggers)}
+
 # ============ API INTEGRATIONS INFO ============
 
 @api_router.get("/integrations/available")
