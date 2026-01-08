@@ -206,6 +206,14 @@ function AppRouter() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/triggers"
+        element={
+          <ProtectedRoute>
+            {({ user }) => <TriggerLibraryPage user={user} />}
+          </ProtectedRoute>
+        }
+      />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
