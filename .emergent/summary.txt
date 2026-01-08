@@ -1,0 +1,178 @@
+<analysis>**original_problem_statement:**
+The user wants to build a secure, simple client portal called Build Compliance for the construction industry. This portal will allow clients of Morrissey Law + Advisory (MLA) to have clear visibility over their projects. The backend will be operated by MLA lawyers and contract administrators to manage contract administration, standardize workflows, generate notices, track deadlines, and create a defensible audit trail.
+
+**PRODUCT REQUIREMENTS:**
+- **Users:** Internal (MLA - full control) and External (Clients - read-only).
+- **Core MVP Features:**
+    1.  **Project Setup:** Backend functionality to define projects with client details, contract info, key dates, and assigned teams.
+    2.  **MLA Operations Portal:** A dashboard for MLA staff to manage all projects, view deadlines, and run structured contract admin checkups.
+    3.  **Structured Digital Questionnaires:** Reusable forms for capturing information on risk events like delays, variations, etc.
+    4.  **Document & Notice Outputs:** Generate and issue templated notices and reports, tracking their status (draft, issued, responded, closed).
+    5.  **Deadlines & Alerts:** A central register for project deadlines with automated reminders and alerts.
+    6.  **Client Portal:** A read-focused view for clients showing project overviews, key dates, issued notices, and risks.
+- **User-Requested Features (added during development):**
+    - **Dashboard:** An Asana-style dashboard rolling up all active projects, deadlines, and notices. Must include project name, value, completion date, outstanding items, and a Request Assistance button.
+    - **Project Creation:** An Add New Project button on the dashboard for lawyers/admins.
+    - **Document Library:** A folder for each client to access documents uploaded by MLA.
+    - **Construction Program (Gantt Chart):** A Gantt chart view per project to manage tasks, and subcontractors, and generate/issue/sign subcontracts. Subcontractors should be invited to the system.
+    - **Gantt Chart Enhancements:** Action buttons on each task (Issue Subcontract/Notice) and a feature to upload a construction program file (e.g., CSV/Excel) to auto-populate tasks.
+    - **Integrations:** Simple API integrations (e.g., Teams, Zoom).
+
+**User's preferred language**: English
+
+**what currently exists?**
+A full-stack application with a FastAPI backend and a React frontend has been developed. Key existing features include:
+- **Authentication:** Google OAuth with role-based access control (client, lawyer, admin). User  is configured as an 'admin'.
+- **Branding:** The application is branded as Build Compliance.
+- **Frontend Pages:** The application has pages for Login, an Asana-style Dashboard, Projects, Project Details, a Document Library, and a placeholder for Integrations.
+- **Project Management:** Lawyers can create new projects via a dialog on the dashboard.
+- **Construction Program:** A  exists with a basic Gantt chart to display project tasks. The backend models have been updated to support this.
+
+**Last working item**:
+- **Last item agent was working:** The agent was enhancing the Gantt chart on the . The goal was to add action buttons (Issue Subcontract, Issue Notice) to each task and implement a feature to upload a program file (like CSV or Excel) to bulk-create tasks. The agent had just updated the backend model in  to support this and was about to modify the frontend.
+- **Status:** IN PROGRESS
+- **Agent Testing Done:** N
+- **Which testing method agent to use?** both
+- **User Testing Done:** N
+
+**All Pending/In progress Issue list**:
+-   **Issue 1 (P0):** Complete Gantt Chart Feature Enhancement.
+
+**Issues Detail:**
+-   **Issue 1: Complete Gantt Chart Feature Enhancement**
+    -   **Attempted fixes:** The agent has updated the  model in  by adding an  field. No frontend changes have been made yet.
+    -   **Next debug checklist:**
+        1.  **Frontend ():**
+            -   Implement an Upload Program button and file handling logic. This will require a parser for CSV/Excel (e.g., ).
+            -   Modify the Gantt chart display to add Issue Subcontract and Issue Notice buttons to each task row.
+            -   Implement the UI logic for these buttons (e.g., opening a modal or navigating to a new page).
+        2.  **Backend ():**
+            -   Create a new API endpoint to handle the bulk creation of tasks from an uploaded file.
+            -   Create new API endpoints to process the Issue Subcontract and Issue Notice actions initiated from the frontend.
+    -   **Why fix this issue and what will be achieved with the fix?** This is a direct user request to make the Gantt chart interactive and a core part of the workflow.
+    -   **Status:** IN PROGRESS
+    -   **Is recurring issue?** N
+    -   **Should Test frontend/backend/both after fix?** Both
+    -   **Blocked on other issue:** None
+
+**In progress Task List**:
+-   **Task 1: Gantt Chart Feature Implementation**
+    -   **Where to resume:** Resume by modifying  to add the Upload Program button and the action buttons for each task in the Gantt chart. Then, implement the necessary backend endpoints.
+    -   **What will be achieved with this?** The construction program feature will become functional, allowing users to import task schedules and initiate key contract actions directly from the Gantt chart.
+    -   **Status:** IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?** Both
+    -   **Blocked on something:** None
+
+**Upcoming and Future Tasks**
+- **Upcoming Tasks:**
+    - **P1: Subcontractor Invitation Flow:** Implement a workflow to invite subcontractors to the system when they are added to a project, granting them access to relevant templates.
+    - **P2: Automated Escalations:** Develop a system for automated escalations for overdue notices or deadlines.
+    - **P2: Structured Digital Questionnaires:** Implement the digital questionnaire feature as described in the original problem statement. This is a core, unimplemented requirement.
+- **Future Tasks:**
+    - **P3: API Integrations:** Build out the simple API integrations requested by the user, starting with Teams and Zoom.
+    - **P3: Contract Admin Checkups:** Implement the feature for MLA lawyers to run structured checkups.
+
+**Completed work in this session**
+- **Initial Application Setup:**
+    - Full-stack application with FastAPI, React, and MongoDB.
+    - Google OAuth authentication and role-based access.
+- **Dashboard & Branding:**
+    - Rebranded app to Build Compliance.
+    - Implemented an Asana-style dashboard ().
+- **Project Management:**
+    - Add New Project functionality for lawyers/admins.
+    - Expanded project data model and updated the project detail page ().
+- **User Management:**
+    - Promoted  to an admin role.
+- **Construction Program (Initial):**
+    - Created the  with a basic Gantt chart.
+    - Added backend support for program tasks in .
+    - Created a Document Library ().
+
+**Earlier issues found/mentioned but not fixed**
+- None.
+
+**Known issue recurrence from previous fork**
+- N/A
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+- **Frontend:** React, Tailwind CSS, , shadcn/ui.
+- **Backend:** FastAPI, Python.
+- **Database:** MongoDB.
+- **Authentication:** Google OAuth 2.0.
+- **Architecture:** Single Page Application (SPA) with a RESTful API.
+
+**key DB schema**
+-   **users:** 
+-   **projects:** 
+-   **program_tasks:** 
+-   **notices:** 
+-   **deadlines:** 
+
+**changes in tech stack**
+- None.
+
+**All files of reference**
+-   : The main FastAPI server containing all API logic.
+-   : The page for the construction program/Gantt chart. This is the primary file for the next set of changes.
+-   : The main user dashboard.
+-   : The main React router configuration.
+-   : The living document tracking project requirements and progress.
+
+**Areas that need refactoring**:
+- The  file contains all backend logic and is growing large. It should be refactored into a modular structure by separating API routes into a  directory and database models into a  file.
+
+**key api endpoints**
+-   , , 
+-   , 
+-   
+-   , , 
+
+**Critical Info for New Agent**
+- The user  is an admin. Use this identity for testing features that require elevated permissions.
+- The project follows an iterative development cycle. Expect to implement a feature, receive user feedback, and then refine it.
+- Key features from the original specification, such as **Structured Digital Questionnaires** and **Automated Escalations**, have not yet been implemented and should be considered for upcoming work.
+
+**documents and test reports created in this job**
+-   /app/memory/PRD.md
+-   /app/test_reports/iteration_1.json
+-   /app/test_reports/iteration_2.json
+-   /app/test_reports/iteration_3.json
+-   /app/test_reports/iteration_4.json
+
+**Last 10 User Messages and any pending HUMAN messages**
+1.  **User:** Requests action buttons (issue subcontract/notice) on Gantt chart tasks and a program upload feature. (IN PROGRESS)
+2.  **User:** Asked how to log in as a lawyer. (RESOLVED)
+3.  **User:** Provided their email to be made an admin. (RESOLVED)
+4.  **User:** Asked where the Add New Project button was. (RESOLVED)
+5.  **User:** Requested dashboard updates: remove Portal from title, make stats clickable, add project creation button/fields. (COMPLETED)
+6.  **User:** (Platform message about credits). (IGNORED)
+7.  **User:** Requested major updates: Build Compliance branding, Asana-style dashboard, document library, and API integrations. (COMPLETED, except for full API integration)
+8.  **User:** Provided initial choices for auth, design, and notifications. (COMPLETED)
+9.  **User:** Requested the construction program/Gantt chart feature with subcontractor management. (IN PROGRESS)
+10. **Agent:** Finished previous iteration. (N/A)
+
+**Project Health Check:**
+-   **Broken:** The Gantt chart feature is incomplete. The new action buttons and upload functionality are missing from the frontend.
+-   **Mocked:** The  and  are placeholders with no backend functionality.
+
+**3rd Party Integrations**
+-   **Emergent-managed Google Auth:** Used for user login.
+-   **Planned:** Microsoft Teams, Zoom.
+
+**Testing status**
+-   **Testing agent used after significant changes:** YES
+-   **Troubleshoot agent used after agent stuck in loop:** NO
+-   **Test files created:** []
+-   **Known regressions:** []
+
+**Credentials to test flow:**
+-   Use Google OAuth for login. To test admin-only features, use the identity of .
+
+**What agent forgot to execute**
+-   **Automated Escalations:** This was requested by the user but has not been implemented or added to the plan.
+-   **Subcontractor Invitation Flow:** This was part of the Gantt chart request but has not been implemented yet. The agent focused on task-level actions first.
+-   **Structured Digital Questionnaires:** This is a core requirement from the initial problem statement that remains unimplemented.</analysis>
