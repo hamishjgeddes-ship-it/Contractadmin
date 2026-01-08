@@ -1222,6 +1222,76 @@ export const ProgramPage = ({ user }) => {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Assign Subcontractor Dialog (for Issue Subcontract flow) */}
+        <Dialog open={assignSubcontractorDialogOpen} onOpenChange={(open) => {
+          setAssignSubcontractorDialogOpen(open);
+          if (!open) setPendingSubcontractTask(null);
+        }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-heading">Assign Subcontractor</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-sm text-slate-600 mb-4">
+                To issue a subcontract for <span className="font-medium">"{pendingSubcontractTask?.name}"</span>, please select or add a subcontractor first.
+              </p>
+              
+              {subcontractors.length > 0 ? (
+                <div className="space-y-3">
+                  <Label>Select Existing Subcontractor</Label>
+                  <div className="max-h-48 overflow-y-auto border rounded-sm">
+                    {subcontractors.map((sub) => {
+                      const hasContract = getSubcontractForSubcontractor(sub.subcontractor_id);
+                      return (
+                        <div
+                          key={sub.subcontractor_id}
+                          className={`p-3 border-b last:border-b-0 hover:bg-slate-50 cursor-pointer flex items-center justify-between ${hasContract ? 'opacity-50' : ''}`}
+                          onClick={() => !hasContract && handleAssignSubcontractorAndIssue(sub.subcontractor_id)}
+                        >
+                          <div>
+                            <p className="font-medium text-sm">{sub.company_name}</p>
+                            <p className="text-xs text-slate-500">{sub.trade} • {sub.contact_name}</p>
+                          </div>
+                          {hasContract ? (
+                            <Badge variant="outline" className="text-[10px]">Has Contract</Badge>
+                          ) : (
+                            <Button size="sm" variant="outline" className="rounded-sm text-xs">
+                              Select
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6 border rounded-sm bg-slate-50">
+                  <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">No subcontractors added yet</p>
+                </div>
+              )}
+              
+              <div className="mt-4 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  className="w-full rounded-sm"
+                  onClick={() => {
+                    setAssignSubcontractorDialogOpen(false);
+                    setSubcontractorDialogOpen(true);
+                  }}
+                >
+                  <UserPlus className="w-4 h-4 mr-2" /> Add New Subcontractor
+                </Button>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setAssignSubcontractorDialogOpen(false)} className="rounded-sm">
+                Cancel
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
