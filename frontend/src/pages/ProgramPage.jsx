@@ -517,7 +517,7 @@ export const ProgramPage = ({ user }) => {
                       <div className="space-y-2">
                         <Label>Trade *</Label>
                         <Select
-                          value={subcontractorForm.trade}
+                          value={subcontractorForm.trade || undefined}
                           onValueChange={(v) => setSubcontractorForm({ ...subcontractorForm, trade: v })}
                         >
                           <SelectTrigger className="rounded-sm">
