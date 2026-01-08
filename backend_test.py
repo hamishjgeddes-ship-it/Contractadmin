@@ -837,6 +837,10 @@ Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"
         self.test_sign_subcontract()
         self.test_list_claim_templates()
         
+        # Issue Subcontract Workflow Tests (NEW)
+        self.test_issue_subcontract_workflow()
+        self.test_assign_subcontractor_to_existing_task()
+        
         # Notification tests
         self.test_list_notifications()
         
@@ -858,6 +862,33 @@ Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"
             return 0
         else:
             print("⚠️  Some tests failed. Check the logs above.")
+            return 1
+
+    def run_issue_subcontract_tests_only(self):
+        """Run only the Issue Subcontract workflow tests"""
+        print("🚀 Starting Issue Subcontract Workflow Tests")
+        print("=" * 60)
+        
+        # Basic setup
+        self.test_health_check()
+        self.test_auth_me()
+        self.test_create_project()
+        
+        # Issue Subcontract Workflow Tests
+        self.test_issue_subcontract_workflow()
+        self.test_assign_subcontractor_to_existing_task()
+        
+        # Print summary
+        print("=" * 60)
+        print(f"📊 Test Results: {self.tests_passed}/{self.tests_run} tests passed")
+        success_rate = (self.tests_passed / self.tests_run * 100) if self.tests_run > 0 else 0
+        print(f"📈 Success Rate: {success_rate:.1f}%")
+        
+        if self.tests_passed == self.tests_run:
+            print("🎉 All Issue Subcontract workflow tests passed!")
+            return 0
+        else:
+            print("⚠️  Some Issue Subcontract workflow tests failed. Check the logs above.")
             return 1
 
 def main():
