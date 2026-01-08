@@ -359,9 +359,18 @@ export const ProgramPage = ({ user }) => {
   };
 
   // Quick action handlers for tasks
+  const [assignSubcontractorDialogOpen, setAssignSubcontractorDialogOpen] = useState(false);
+  const [pendingSubcontractTask, setPendingSubcontractTask] = useState(null);
+
   const openSubcontractForTask = (task) => {
     const sub = subcontractors.find(s => s.subcontractor_id === task.assigned_subcontractor_id);
     if (sub) {
+      // Check if subcontract already exists
+      const existingContract = getSubcontractForSubcontractor(sub.subcontractor_id);
+      if (existingContract) {
+        toast.info(`Subcontract already exists (Status: ${existingContract.status})`);
+        return;
+      }
       setSelectedSubcontractor(sub);
       setSubcontractForm({
         title: `${sub.trade} Works - ${task.name}`,
@@ -371,7 +380,45 @@ export const ProgramPage = ({ user }) => {
       });
       setSubcontractDialogOpen(true);
     } else {
-      toast.error("Please assign a subcontractor to this task first");
+      // No subcontractor assigned - open dialog to assign one first
+      setPendingSubcontractTask(task);
+      setAssignSubcontractorDialogOpen(true);
+    }
+  };
+
+  const handleAssignSubcontractorAndIssue = async (subcontractorId) => {
+    if (!pendingSubcontractTask || !subcontractorId) return;
+    
+    try {
+      // Assign subcontractor to task
+      await axios.patch(
+        `${API}/projects/${projectId}/program/${pendingSubcontractTask.task_id}`,
+        { assigned_subcontractor_id: subcontractorId },
+        { withCredentials: true }
+      );
+      
+      // Close assign dialog
+      setAssignSubcontractorDialogOpen(false);
+      
+      // Refresh data
+      await fetchData();
+      
+      // Now open subcontract dialog
+      const sub = subcontractors.find(s => s.subcontractor_id === subcontractorId);
+      if (sub) {
+        setSelectedSubcontractor(sub);
+        setSubcontractForm({
+          title: `${sub.trade} Works - ${pendingSubcontractTask.name}`,
+          contract_value: "",
+          scope_of_work: `Scope for ${pendingSubcontractTask.name}:\n- Work period: ${pendingSubcontractTask.start_date} to ${pendingSubcontractTask.end_date}`,
+          terms: "",
+        });
+        setSubcontractDialogOpen(true);
+      }
+      
+      setPendingSubcontractTask(null);
+    } catch (error) {
+      toast.error("Failed to assign subcontractor");
     }
   };
 
