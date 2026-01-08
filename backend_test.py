@@ -377,6 +377,418 @@ class BuildCompliancePortalTester:
         except Exception as e:
             return self.log_test("Project Summary", False, f"Error: {str(e)}")
 
+    # ============ ENHANCED DASHBOARD TESTS ============
+
+    def test_seed_default_triggers(self):
+        """Test seeding default construction triggers"""
+        try:
+            response = requests.post(f"{self.api_url}/triggers/seed-defaults", json={}, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                created_count = data.get('created_count', 0)
+                total_defaults = data.get('total_defaults', 0)
+                details += f", Created: {created_count}/{total_defaults} triggers"
+            return self.log_test("Seed Default Triggers", success, details)
+        except Exception as e:
+            return self.log_test("Seed Default Triggers", False, f"Error: {str(e)}")
+
+    def test_list_triggers(self):
+        """Test listing all trigger templates"""
+        try:
+            response = requests.get(f"{self.api_url}/triggers", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Count: {len(data)} triggers"
+                # Check for some expected default triggers
+                trigger_names = [t.get('name', '') for t in data]
+                if 'Delay Notice Required' in trigger_names and 'Variation Claim Due' in trigger_names:
+                    details += ", Default triggers found"
+                else:
+                    details += ", WARNING: Some default triggers missing"
+            return self.log_test("List Triggers", success, details)
+        except Exception as e:
+            return self.log_test("List Triggers", False, f"Error: {str(e)}")
+
+    def test_create_custom_trigger(self):
+        """Test creating a custom trigger template"""
+        try:
+            trigger_data = {
+                "name": "Test Custom Trigger",
+                "event_type": "general",
+                "description": "Custom trigger for testing purposes",
+                "importance": "medium",
+                "next_steps": "Complete test action",
+                "outcome": "Test outcome",
+                "days_to_orange": 5,
+                "days_to_red": 2,
+                "causes_red_flag": True,
+                "requires_due_date": True,
+                "requires_value": False,
+                "min_value_for_red": 0.0
+            }
+            response = requests.post(f"{self.api_url}/triggers", json=trigger_data, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                self.trigger_id = data.get('trigger_id')
+                details += f", Trigger ID: {self.trigger_id}"
+                # Verify it's not a system trigger
+                if not data.get('is_system', False):
+                    details += ", Custom trigger created correctly"
+                else:
+                    details += ", WARNING: Custom trigger marked as system"
+            return self.log_test("Create Custom Trigger", success, details)
+        except Exception as e:
+            return self.log_test("Create Custom Trigger", False, f"Error: {str(e)}")
+
+    def test_update_trigger(self):
+        """Test updating a custom trigger template"""
+        if not self.trigger_id:
+            return self.log_test("Update Trigger", False, "No trigger ID available")
+        
+        try:
+            update_data = {
+                "description": "Updated test trigger description",
+                "days_to_orange": 10,
+                "days_to_red": 3
+            }
+            response = requests.patch(f"{self.api_url}/triggers/{self.trigger_id}", json=update_data, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            return self.log_test("Update Trigger", success, details)
+        except Exception as e:
+            return self.log_test("Update Trigger", False, f"Error: {str(e)}")
+
+    def test_get_trigger(self):
+        """Test getting a specific trigger template"""
+        if not self.trigger_id:
+            return self.log_test("Get Trigger", False, "No trigger ID available")
+        
+        try:
+            response = requests.get(f"{self.api_url}/triggers/{self.trigger_id}", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Name: {data.get('name', 'Unknown')}"
+            return self.log_test("Get Trigger", success, details)
+        except Exception as e:
+            return self.log_test("Get Trigger", False, f"Error: {str(e)}")
+
+    def test_delete_custom_trigger(self):
+        """Test deleting a custom trigger (should work)"""
+        if not self.trigger_id:
+            return self.log_test("Delete Custom Trigger", False, "No trigger ID available")
+        
+        try:
+            response = requests.delete(f"{self.api_url}/triggers/{self.trigger_id}", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            return self.log_test("Delete Custom Trigger", success, details)
+        except Exception as e:
+            return self.log_test("Delete Custom Trigger", False, f"Error: {str(e)}")
+
+    def test_delete_system_trigger_fails(self):
+        """Test that deleting system triggers fails"""
+        try:
+            # First get a system trigger ID
+            response = requests.get(f"{self.api_url}/triggers", headers=self.headers, timeout=10)
+            if response.status_code != 200:
+                return self.log_test("Delete System Trigger (Should Fail)", False, "Could not get triggers list")
+            
+            triggers = response.json()
+            system_trigger = next((t for t in triggers if t.get('is_system', False)), None)
+            if not system_trigger:
+                return self.log_test("Delete System Trigger (Should Fail)", False, "No system triggers found")
+            
+            # Try to delete system trigger - should fail
+            response = requests.delete(f"{self.api_url}/triggers/{system_trigger['trigger_id']}", headers=self.headers, timeout=10)
+            success = response.status_code == 403  # Should be forbidden
+            details = f"Status: {response.status_code} (Expected 403)"
+            if success:
+                details += ", Correctly prevented system trigger deletion"
+            return self.log_test("Delete System Trigger (Should Fail)", success, details)
+        except Exception as e:
+            return self.log_test("Delete System Trigger (Should Fail)", False, f"Error: {str(e)}")
+
+    def test_create_project_event(self):
+        """Test creating a project event with trigger"""
+        if not self.project_id:
+            return self.log_test("Create Project Event", False, "No project ID available")
+        
+        try:
+            # First get a trigger to use
+            response = requests.get(f"{self.api_url}/triggers", headers=self.headers, timeout=10)
+            if response.status_code != 200:
+                return self.log_test("Create Project Event", False, "Could not get triggers list")
+            
+            triggers = response.json()
+            if not triggers:
+                return self.log_test("Create Project Event", False, "No triggers available")
+            
+            trigger = triggers[0]  # Use first available trigger
+            
+            # Create event with due date in 14 days (should be green)
+            event_data = {
+                "project_id": self.project_id,
+                "trigger_id": trigger['trigger_id'],
+                "title": "Test Event - Green Status",
+                "description": "Test event for status color calculation",
+                "due_date": (datetime.now() + timedelta(days=14)).isoformat(),
+                "value": 5000.0,
+                "notes": "Test event notes"
+            }
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/events", json=event_data, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                self.event_id = data.get('event_id')
+                status_color = data.get('status_color', 'unknown')
+                details += f", Event ID: {self.event_id}, Status Color: {status_color}"
+                if status_color == 'green':
+                    details += " (Correct - 14 days out)"
+                else:
+                    details += f" (Expected green for 14 days out)"
+            return self.log_test("Create Project Event", success, details)
+        except Exception as e:
+            return self.log_test("Create Project Event", False, f"Error: {str(e)}")
+
+    def test_list_project_events(self):
+        """Test listing project events with calculated status colors"""
+        if not self.project_id:
+            return self.log_test("List Project Events", False, "No project ID available")
+        
+        try:
+            response = requests.get(f"{self.api_url}/projects/{self.project_id}/events", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Count: {len(data)} events"
+                if data:
+                    # Check if status colors are calculated
+                    colors = [e.get('status_color') for e in data]
+                    details += f", Colors: {set(colors)}"
+            return self.log_test("List Project Events", success, details)
+        except Exception as e:
+            return self.log_test("List Project Events", False, f"Error: {str(e)}")
+
+    def test_status_color_scenarios(self):
+        """Test different status color calculation scenarios"""
+        if not self.project_id:
+            return self.log_test("Status Color Scenarios", False, "No project ID available")
+        
+        try:
+            # Get a trigger for testing
+            response = requests.get(f"{self.api_url}/triggers", headers=self.headers, timeout=10)
+            if response.status_code != 200:
+                return self.log_test("Status Color Scenarios", False, "Could not get triggers")
+            
+            triggers = response.json()
+            if not triggers:
+                return self.log_test("Status Color Scenarios", False, "No triggers available")
+            
+            trigger = triggers[0]
+            scenario_results = []
+            
+            # Scenario 1: Orange status (5 days out, default threshold 7 days)
+            event_data = {
+                "project_id": self.project_id,
+                "trigger_id": trigger['trigger_id'],
+                "title": "Test Event - Orange Status",
+                "due_date": (datetime.now() + timedelta(days=5)).isoformat(),
+                "value": 1000.0
+            }
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/events", json=event_data, headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                color = data.get('status_color', 'unknown')
+                scenario_results.append(f"5 days out: {color}")
+            
+            # Scenario 2: Red status (overdue)
+            event_data = {
+                "project_id": self.project_id,
+                "trigger_id": trigger['trigger_id'],
+                "title": "Test Event - Red Status",
+                "due_date": (datetime.now() - timedelta(days=1)).isoformat(),
+                "value": 1000.0
+            }
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/events", json=event_data, headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                color = data.get('status_color', 'unknown')
+                scenario_results.append(f"Overdue: {color}")
+            
+            # Scenario 3: Test trigger that doesn't cause red flag
+            non_red_trigger = next((t for t in triggers if not t.get('causes_red_flag', True)), None)
+            if non_red_trigger:
+                event_data = {
+                    "project_id": self.project_id,
+                    "trigger_id": non_red_trigger['trigger_id'],
+                    "title": "Test Event - No Red Flag",
+                    "due_date": (datetime.now() - timedelta(days=1)).isoformat()
+                }
+                response = requests.post(f"{self.api_url}/projects/{self.project_id}/events", json=event_data, headers=self.headers, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    color = data.get('status_color', 'unknown')
+                    scenario_results.append(f"No red flag trigger overdue: {color}")
+            
+            success = len(scenario_results) > 0
+            details = f"Scenarios tested: {'; '.join(scenario_results)}"
+            return self.log_test("Status Color Scenarios", success, details)
+        except Exception as e:
+            return self.log_test("Status Color Scenarios", False, f"Error: {str(e)}")
+
+    def test_update_project_event(self):
+        """Test updating a project event and status transitions"""
+        if not self.project_id or not self.event_id:
+            return self.log_test("Update Project Event", False, "No project ID or event ID available")
+        
+        try:
+            # Test completing an event (should turn green)
+            update_data = {
+                "status": "completed",
+                "notes": "Event completed during testing"
+            }
+            response = requests.patch(f"{self.api_url}/projects/{self.project_id}/events/{self.event_id}", 
+                                    json=update_data, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            
+            if success:
+                # Verify the event is now completed by getting the events list
+                response = requests.get(f"{self.api_url}/projects/{self.project_id}/events", headers=self.headers, timeout=10)
+                if response.status_code == 200:
+                    events = response.json()
+                    updated_event = next((e for e in events if e['event_id'] == self.event_id), None)
+                    if updated_event:
+                        status = updated_event.get('status')
+                        color = updated_event.get('status_color')
+                        details += f", Status: {status}, Color: {color}"
+                        if status == 'completed' and color == 'green':
+                            details += " (Correct - completed events are green)"
+            
+            return self.log_test("Update Project Event", success, details)
+        except Exception as e:
+            return self.log_test("Update Project Event", False, f"Error: {str(e)}")
+
+    def test_manual_status_override(self):
+        """Test manual status override functionality"""
+        if not self.project_id or not self.event_id:
+            return self.log_test("Manual Status Override", False, "No project ID or event ID available")
+        
+        try:
+            # Test manual override to orange
+            update_data = {
+                "manual_status_override": "orange",
+                "override_reason": "Manual override for testing"
+            }
+            response = requests.patch(f"{self.api_url}/projects/{self.project_id}/events/{self.event_id}", 
+                                    json=update_data, headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            
+            if success:
+                # Verify the override worked
+                response = requests.get(f"{self.api_url}/projects/{self.project_id}/events", headers=self.headers, timeout=10)
+                if response.status_code == 200:
+                    events = response.json()
+                    updated_event = next((e for e in events if e['event_id'] == self.event_id), None)
+                    if updated_event:
+                        override = updated_event.get('manual_status_override')
+                        color = updated_event.get('status_color')
+                        details += f", Override: {override}, Color: {color}"
+                        if override == 'orange' and color == 'orange':
+                            details += " (Override working correctly)"
+            
+            return self.log_test("Manual Status Override", success, details)
+        except Exception as e:
+            return self.log_test("Manual Status Override", False, f"Error: {str(e)}")
+
+    def test_delete_project_event(self):
+        """Test deleting a project event"""
+        if not self.project_id or not self.event_id:
+            return self.log_test("Delete Project Event", False, "No project ID or event ID available")
+        
+        try:
+            response = requests.delete(f"{self.api_url}/projects/{self.project_id}/events/{self.event_id}", 
+                                     headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            return self.log_test("Delete Project Event", success, details)
+        except Exception as e:
+            return self.log_test("Delete Project Event", False, f"Error: {str(e)}")
+
+    def test_list_clients(self):
+        """Test listing clients with aggregated data"""
+        try:
+            response = requests.get(f"{self.api_url}/clients", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Count: {len(data)} clients"
+                if data:
+                    # Check if aggregated fields are present
+                    client = data[0]
+                    fields = ['client_name', 'project_count', 'action_items', 'overdue_items']
+                    present_fields = [f for f in fields if f in client]
+                    details += f", Fields: {present_fields}"
+            return self.log_test("List Clients", success, details)
+        except Exception as e:
+            return self.log_test("List Clients", False, f"Error: {str(e)}")
+
+    def test_projects_with_status(self):
+        """Test listing projects with calculated status colors"""
+        try:
+            response = requests.get(f"{self.api_url}/projects/with-status", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                details += f", Count: {len(data)} projects"
+                if data:
+                    # Check if status fields are present
+                    project = data[0]
+                    status_fields = ['status_color', 'next_due_date', 'pending_events_count']
+                    present_fields = [f for f in status_fields if f in project]
+                    details += f", Status fields: {present_fields}"
+                    
+                    # Check status colors
+                    colors = [p.get('status_color') for p in data]
+                    unique_colors = set(colors)
+                    details += f", Colors: {unique_colors}"
+            return self.log_test("Projects with Status", success, details)
+        except Exception as e:
+            return self.log_test("Projects with Status", False, f"Error: {str(e)}")
+
+    def test_project_status(self):
+        """Test getting individual project status"""
+        if not self.project_id:
+            return self.log_test("Project Status", False, "No project ID available")
+        
+        try:
+            response = requests.get(f"{self.api_url}/projects/{self.project_id}/status", headers=self.headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                data = response.json()
+                overall_status = data.get('overall_status', 'unknown')
+                red_count = data.get('red_events_count', 0)
+                orange_count = data.get('orange_events_count', 0)
+                pending_count = data.get('total_pending_events', 0)
+                details += f", Overall: {overall_status}, Red: {red_count}, Orange: {orange_count}, Pending: {pending_count}"
+            return self.log_test("Project Status", success, details)
+        except Exception as e:
+            return self.log_test("Project Status", False, f"Error: {str(e)}")
+
     # ============ CONSTRUCTION PROGRAM TESTS ============
 
     def test_get_program_tasks(self):
