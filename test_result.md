@@ -234,12 +234,13 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Trigger Library CRUD"
-    - "Project Events with Status Colors"
     - "Dashboard Clients Tab"
-    - "Projects List/Card Toggle"
+    - "Dashboard Projects View Toggle"
+    - "Project Status Colors"
+    - "Trigger Library Page"
+    - "Project Events Section"
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
