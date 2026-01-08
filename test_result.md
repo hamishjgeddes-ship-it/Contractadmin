@@ -107,63 +107,78 @@ user_problem_statement: "Build Compliance portal - Gantt Chart Enhancement with 
 backend:
   - task: "CSV Program Import Endpoint"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Endpoint /api/projects/{project_id}/program/import exists. Handles CSV file upload, creates tasks and subcontractors. Needs testing."
+      - working: true
+        agent: "testing"
+        comment: "✅ CSV import endpoint tested successfully. Imported 5 tasks and 5 subcontractors from test CSV file. Supports multiple date formats, creates subcontractors automatically, assigns colors to tasks. All functionality working correctly."
 
   - task: "Program Task CRUD APIs"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "GET/POST/PATCH/DELETE endpoints for program tasks exist."
+      - working: true
+        agent: "testing"
+        comment: "✅ All program task CRUD operations tested successfully. GET returns task list, POST creates tasks with proper validation, PATCH updates task progress and status, DELETE removes tasks. All endpoints working correctly."
 
   - task: "Subcontractor APIs"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Subcontractor CRUD endpoints exist."
+      - working: true
+        agent: "testing"
+        comment: "✅ Subcontractor APIs tested successfully. GET lists subcontractors, POST creates and invites subcontractors with automatic user account creation, PATCH updates subcontractor details. All functionality working correctly."
 
   - task: "Subcontract APIs (Issue/Sign)"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Subcontract endpoints with issue and sign functionality exist."
+      - working: true
+        agent: "testing"
+        comment: "✅ Subcontract flow tested successfully. POST creates draft subcontracts, /issue endpoint changes status to issued and notifies subcontractor, /sign endpoint allows subcontractor to sign and updates status. Complete workflow functioning properly."
 
   - task: "Notice Creation API"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Notice creation endpoint exists."
+      - working: true
+        agent: "testing"
+        comment: "✅ Notice creation API tested successfully. POST /api/notices creates notices with proper project association, supports multiple notice types (variation, delay, latent_condition, etc.), handles recipient email assignment. All functionality working correctly."
 
 frontend:
   - task: "Upload Program CSV Button"
