@@ -193,8 +193,36 @@ export const DashboardPage = ({ user }) => {
         client_team_members: projectForm.client_team_members,
         bc_team_members: projectForm.bc_team_members,
       };
-      await axios.post(`${API}/projects`, payload, { withCredentials: true });
-      toast.success("Project created successfully");
+      
+      // Create the project
+      const projectRes = await axios.post(`${API}/projects`, payload, { withCredentials: true });
+      const newProjectId = projectRes.data.project_id;
+      
+      // Create events from selected triggers
+      if (selectedTriggers.length > 0 && newProjectId) {
+        const eventPromises = selectedTriggers.map(triggerId => {
+          const trigger = triggers.find(t => t.trigger_id === triggerId);
+          if (!trigger) return Promise.resolve();
+          
+          return axios.post(`${API}/projects/${newProjectId}/events`, {
+            project_id: newProjectId,
+            trigger_id: triggerId,
+            title: trigger.name,
+            description: trigger.description || null,
+            due_date: null, // Lawyer will set specific due dates later
+            value: null,
+            notes: trigger.next_steps || null,
+          }, { withCredentials: true }).catch(err => {
+            console.error(`Failed to create event for trigger ${trigger.name}:`, err);
+          });
+        });
+        
+        await Promise.all(eventPromises);
+        toast.success(`Project created with ${selectedTriggers.length} trigger events`);
+      } else {
+        toast.success("Project created successfully");
+      }
+      
       setProjectDialogOpen(false);
       setProjectForm({
         name: "", client_name: "", client_email: "", contract_type: "", description: "",
@@ -203,6 +231,8 @@ export const DashboardPage = ({ user }) => {
       });
       setStartDate(null);
       setOriginalCompletionDate(null);
+      // Reset selected triggers to all
+      setSelectedTriggers(triggers.map(t => t.trigger_id));
       fetchData();
     } catch (error) {
       console.error("Error creating project:", error);
