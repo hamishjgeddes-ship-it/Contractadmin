@@ -8,6 +8,7 @@ import { Progress } from "../components/ui/progress";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
+import { Checkbox } from "../components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +64,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronRight,
+  Zap,
 } from "lucide-react";
 import axios from "axios";
 import { API } from "../App";
@@ -74,6 +76,7 @@ export const DashboardPage = ({ user }) => {
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
+  const [triggers, setTriggers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [assistanceDialogOpen, setAssistanceDialogOpen] = useState(false);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
@@ -86,6 +89,9 @@ export const DashboardPage = ({ user }) => {
   const [viewMode, setViewMode] = useState("list"); // "list" or "cards"
   const [sortBy, setSortBy] = useState("status"); // "status", "client", "due_date", "name"
   const [filterClient, setFilterClient] = useState("all");
+  
+  // Selected triggers for new project
+  const [selectedTriggers, setSelectedTriggers] = useState([]);
   
   const [assistanceForm, setAssistanceForm] = useState({
     subject: "",
@@ -120,6 +126,7 @@ export const DashboardPage = ({ user }) => {
       
       if (isLawyer) {
         requests.push(axios.get(`${API}/clients`, { withCredentials: true }));
+        requests.push(axios.get(`${API}/triggers`, { withCredentials: true }));
       }
       
       const results = await Promise.all(requests);
@@ -127,6 +134,11 @@ export const DashboardPage = ({ user }) => {
       setProjects(results[1].data);
       if (isLawyer && results[2]) {
         setClients(results[2].data);
+      }
+      if (isLawyer && results[3]) {
+        setTriggers(results[3].data);
+        // Pre-select all triggers by default
+        setSelectedTriggers(results[3].data.map(t => t.trigger_id));
       }
     } catch (error) {
       console.error("Error fetching data:", error);
