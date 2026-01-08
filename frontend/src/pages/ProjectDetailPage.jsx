@@ -37,6 +37,7 @@ import axios from "axios";
 import { API } from "../App";
 import { toast } from "sonner";
 import { format, parseISO, differenceInDays } from "date-fns";
+import { ProjectEventsSection } from "../components/ProjectEventsSection";
 
 export const ProjectDetailPage = ({ user }) => {
   const { projectId } = useParams();
