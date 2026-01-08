@@ -1214,6 +1214,25 @@ Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"
         self.test_create_project()
         self.test_list_projects()
         
+        # Enhanced Dashboard tests
+        print("\n🎯 Testing Enhanced Dashboard Features...")
+        self.test_seed_default_triggers()
+        self.test_list_triggers()
+        self.test_create_custom_trigger()
+        self.test_update_trigger()
+        self.test_get_trigger()
+        self.test_delete_system_trigger_fails()
+        self.test_create_project_event()
+        self.test_list_project_events()
+        self.test_status_color_scenarios()
+        self.test_update_project_event()
+        self.test_manual_status_override()
+        self.test_list_clients()
+        self.test_projects_with_status()
+        self.test_project_status()
+        self.test_delete_project_event()
+        self.test_delete_custom_trigger()
+        
         # Deadline management tests
         self.test_create_deadline()
         self.test_list_deadlines()
