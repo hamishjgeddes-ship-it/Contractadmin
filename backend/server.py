@@ -1653,7 +1653,7 @@ async def list_clients(user: User = Depends(require_lawyer)):
 
 # ============ PROJECT STATUS CALCULATION ============
 
-@api_router.get("/projects-with-status", response_model=List[dict])
+@api_router.get("/projects/with-status", response_model=List[dict])
 async def list_projects_with_status(user: User = Depends(get_current_user)):
     """List all projects with their calculated status colors."""
     if user.role in ["lawyer", "admin"]:
