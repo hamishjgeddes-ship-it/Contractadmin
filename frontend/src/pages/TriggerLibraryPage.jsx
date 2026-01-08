@@ -397,7 +397,7 @@ export const TriggerLibraryPage = ({ user }) => {
                       <div className="flex items-center justify-between">
                         <div>
                           <Label>Requires Due Date</Label>
-                          <p className="text-xs text-slate-500">Events without due date won't trigger status</p>
+                          <p className="text-xs text-slate-500">Events without due date will not trigger status</p>
                         </div>
                         <Switch
                           checked={form.requires_due_date}
@@ -407,7 +407,7 @@ export const TriggerLibraryPage = ({ user }) => {
                       <div className="flex items-center justify-between">
                         <div>
                           <Label>Requires Value</Label>
-                          <p className="text-xs text-slate-500">Events without value won't trigger red status</p>
+                          <p className="text-xs text-slate-500">Events without value will not trigger red status</p>
                         </div>
                         <Switch
                           checked={form.requires_value}
@@ -424,7 +424,7 @@ export const TriggerLibraryPage = ({ user }) => {
                             min={0}
                             className="rounded-sm"
                           />
-                          <p className="text-xs text-slate-500">Events below this value won't trigger red</p>
+                          <p className="text-xs text-slate-500">Events below this value will not trigger red</p>
                         </div>
                       )}
                     </div>
