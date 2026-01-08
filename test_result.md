@@ -245,3 +245,5 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Implemented comprehensive dashboard enhancement with Clients tab, project status colors (Green/Orange/Red), List/Card toggle, sorting, and Trigger Library. Ready for full testing."
+  - agent: "testing"
+    message: "✅ BACKEND TESTING COMPLETE - All Enhanced Dashboard backend APIs are working correctly. Fixed critical routing issue with /projects/with-status endpoint by moving it before parameterized routes. All trigger library, project events, clients, and project status APIs tested successfully. Status color calculation logic working as expected with proper green/orange/red transitions based on due dates and trigger rules. Ready for frontend testing."
