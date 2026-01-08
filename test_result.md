@@ -107,51 +107,63 @@ user_problem_statement: "Enhanced Dashboard with Clients tab, Project status col
 backend:
   - task: "Trigger Library CRUD APIs"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "GET/POST/PATCH/DELETE /api/triggers endpoints. Also seed-defaults endpoint."
+      - working: true
+        agent: "testing"
+        comment: "✅ All trigger library APIs working correctly. Tested: seed defaults (9 triggers), list triggers, create custom trigger, update trigger, get trigger, delete custom trigger. System trigger deletion correctly prevented (403). Route fixed by moving /projects/with-status before parameterized routes."
 
   - task: "Project Events CRUD APIs"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "GET/POST/PATCH/DELETE /api/projects/{id}/events endpoints with status color calculation."
+      - working: true
+        agent: "testing"
+        comment: "✅ All project events APIs working correctly. Tested: create event, list events with status colors, status color scenarios (green/orange/red), update event with status transitions, manual status override, delete event. Status color calculation logic working as expected."
 
   - task: "Clients List API"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "GET /api/clients - aggregates clients from projects with counts."
+      - working: true
+        agent: "testing"
+        comment: "✅ Clients API working correctly. Returns aggregated client data with project_count, action_items, overdue_items fields as expected."
 
   - task: "Projects with Status API"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "GET /api/projects/with-status - returns projects with calculated status_color."
+      - working: true
+        agent: "testing"
+        comment: "✅ Projects with status API working correctly after route order fix. Returns projects with status_color, next_due_date, pending_events_count fields. Status colors calculated properly (red/green observed)."
 
 frontend:
   - task: "Dashboard Clients Tab"
