@@ -1513,7 +1513,7 @@ def calculate_event_status_color(event: dict, trigger: dict) -> str:
                 return "red"
             elif days_until_due <= days_to_orange:
                 return "orange"
-        except:
+        except (ValueError, TypeError):
             pass
     
     return "green"
