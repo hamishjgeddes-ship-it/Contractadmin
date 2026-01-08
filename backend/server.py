@@ -949,6 +949,125 @@ async def create_program_task(project_id: str, task_data: ProgramTaskCreate, use
     await db.program_tasks.insert_one(doc)
     return {k: v for k, v in doc.items() if k != "_id"}
 
+@api_router.post("/projects/{project_id}/program/import")
+async def import_program(project_id: str, file: UploadFile = File(...), user: User = Depends(require_lawyer)):
+    """Import a construction program from CSV file.
+    
+    Expected CSV columns: task_name, start_date, end_date, subcontractor_name, subcontractor_trade, subcontractor_email
+    Dates should be in YYYY-MM-DD or DD/MM/YYYY format.
+    """
+    import csv
+    import io
+    
+    # Verify project exists
+    project = await db.projects.find_one({"project_id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Read file content
+    content = await file.read()
+    try:
+        # Try to decode as UTF-8
+        text_content = content.decode('utf-8')
+    except UnicodeDecodeError:
+        # Try latin-1 as fallback
+        text_content = content.decode('latin-1')
+    
+    # Parse CSV
+    reader = csv.DictReader(io.StringIO(text_content))
+    
+    tasks_created = 0
+    subcontractors_created = 0
+    errors = []
+    
+    # Color palette for auto-assignment
+    colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#64748b"]
+    color_index = 0
+    
+    for row_num, row in enumerate(reader, start=2):
+        try:
+            task_name = row.get('task_name', '').strip()
+            start_date = row.get('start_date', '').strip()
+            end_date = row.get('end_date', '').strip()
+            subcontractor_name = row.get('subcontractor_name', '').strip()
+            subcontractor_trade = row.get('subcontractor_trade', '').strip()
+            subcontractor_email = row.get('subcontractor_email', '').strip()
+            
+            if not task_name or not start_date or not end_date:
+                errors.append(f"Row {row_num}: Missing required fields (task_name, start_date, end_date)")
+                continue
+            
+            # Parse dates - support multiple formats
+            def parse_date(date_str):
+                for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y']:
+                    try:
+                        from datetime import datetime
+                        return datetime.strptime(date_str, fmt).strftime('%Y-%m-%d')
+                    except ValueError:
+                        continue
+                return None
+            
+            parsed_start = parse_date(start_date)
+            parsed_end = parse_date(end_date)
+            
+            if not parsed_start or not parsed_end:
+                errors.append(f"Row {row_num}: Invalid date format for '{task_name}'")
+                continue
+            
+            # Handle subcontractor
+            subcontractor_id = None
+            if subcontractor_name:
+                # Check if subcontractor exists
+                existing_sub = await db.subcontractors.find_one({
+                    "project_id": project_id,
+                    "company_name": {"$regex": f"^{subcontractor_name}$", "$options": "i"}
+                }, {"_id": 0})
+                
+                if existing_sub:
+                    subcontractor_id = existing_sub["subcontractor_id"]
+                else:
+                    # Create new subcontractor
+                    new_sub = Subcontractor(
+                        project_id=project_id,
+                        company_name=subcontractor_name,
+                        contact_name=subcontractor_name,
+                        email=subcontractor_email or f"{subcontractor_name.lower().replace(' ', '')}@placeholder.com",
+                        trade=subcontractor_trade or "Other",
+                        status="pending",
+                        created_by=user.user_id
+                    )
+                    sub_doc = new_sub.model_dump()
+                    sub_doc['created_at'] = sub_doc['created_at'].isoformat()
+                    await db.subcontractors.insert_one(sub_doc)
+                    subcontractor_id = new_sub.subcontractor_id
+                    subcontractors_created += 1
+            
+            # Create task
+            task = ProgramTask(
+                project_id=project_id,
+                name=task_name,
+                start_date=parsed_start,
+                end_date=parsed_end,
+                assigned_subcontractor_id=subcontractor_id,
+                color=colors[color_index % len(colors)],
+                created_by=user.user_id
+            )
+            task_doc = task.model_dump()
+            task_doc['created_at'] = task_doc['created_at'].isoformat()
+            await db.program_tasks.insert_one(task_doc)
+            tasks_created += 1
+            color_index += 1
+            
+        except Exception as e:
+            errors.append(f"Row {row_num}: {str(e)}")
+    
+    return {
+        "message": f"Import completed",
+        "tasks_created": tasks_created,
+        "subcontractors_created": subcontractors_created,
+        "errors": errors[:10] if errors else []  # Return first 10 errors
+    }
+
 @api_router.patch("/projects/{project_id}/program/{task_id}")
 async def update_program_task(project_id: str, task_id: str, updates: dict, user: User = Depends(require_lawyer)):
     """Update a program task."""

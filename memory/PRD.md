@@ -30,7 +30,7 @@ A simple, secure client portal for Build Compliance that gives construction clie
 
 ### Backend (FastAPI)
 - ✅ Authentication via Emergent Google OAuth
-- ✅ User management with roles (admin, lawyer, client)
+- ✅ User management with roles (admin, lawyer, client, subcontractor)
 - ✅ Project CRUD with extended fields:
   - Time: start_date, original_completion_date, current_completion_date
   - Cost: starting_value, current_value
@@ -46,6 +46,11 @@ A simple, secure client portal for Build Compliance that gives construction clie
 - ✅ API integrations info endpoint
 - ✅ Dashboard statistics with overdue tracking
 - ✅ Project summary endpoint with outstanding items
+- ✅ **Construction Program (Gantt chart)**:
+  - Program tasks with dates, progress, color coding
+  - Subcontractor management with invitation system
+  - Subcontract workflow (draft → issue → sign)
+  - Claim templates for subcontractors
 
 ### Frontend (React)
 - ✅ Login page with Build Compliance branding
@@ -66,6 +71,14 @@ A simple, secure client portal for Build Compliance that gives construction clie
   - Value tracking with % change
   - Timeline with progress bar
   - Team member display
+  - **Construction Program button**
+- ✅ **Construction Program page**:
+  - Gantt chart with tasks and progress tracking
+  - Subcontractors tab with invitation management
+  - Subcontracts tab with draft/issue/sign workflow
+  - Add Task dialog with subcontractor assignment
+  - Add Subcontractor dialog with trade selection
+  - Create Subcontract dialog with scope/terms
 - ✅ Document Library page
 - ✅ Integrations page
 - ✅ Quick Links sidebar
