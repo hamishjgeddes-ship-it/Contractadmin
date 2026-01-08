@@ -653,11 +653,11 @@ export const ProgramPage = ({ user }) => {
                           </SelectTrigger>
                           <SelectContent>
                             {taskColors.map((c) => (
-                              <SelectItem key={c.value} value={c.value}>
-                                <span className="flex items-center gap-2">
-                                  <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: c.value }} />
-                                  {c.label}
-                                </span>
+                              <SelectItem key={c.value} value={c.value} className="flex items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.value }} />
+                                  <span>{c.label}</span>
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
