@@ -275,3 +275,5 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Fixed SelectItem issues in ProgramPage.jsx. The color selector had a span wrapper causing Radix UI errors. Also fixed trade Select to use undefined for empty value to enable placeholder display. Ready for full Gantt chart feature testing including CSV import, task creation, and action buttons."
+  - agent: "testing"
+    message: "✅ BACKEND TESTING COMPLETE - All Construction Program (Gantt Chart) backend APIs tested successfully. CSV import works perfectly (imported 5 tasks + 5 subcontractors), all CRUD operations functional, subcontract issue/sign flow working, notice creation operational. Frontend components verified: Upload Program dropdown, Add Task/Subcontractor dialogs, task action dropdowns with Issue Subcontract/Notice/Delete options all properly implemented. 31/31 backend tests passed (100% success rate). Ready for main agent to summarize and finish."
