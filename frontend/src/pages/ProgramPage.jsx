@@ -868,14 +868,29 @@ export const ProgramPage = ({ user }) => {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    {sub && !existingContract && (
-                                      <DropdownMenuItem onClick={() => openSubcontractForTask(task)}>
-                                        <FileText className="w-4 h-4 mr-2" /> Issue Subcontract
+                                    {/* Issue Subcontract - always visible */}
+                                    {(!existingContract || existingContract?.status === 'draft') && (
+                                      <>
+                                        {!existingContract && (
+                                          <DropdownMenuItem onClick={() => openSubcontractForTask(task)}>
+                                            <FileText className="w-4 h-4 mr-2" /> Issue Subcontract
+                                          </DropdownMenuItem>
+                                        )}
+                                        {existingContract?.status === 'draft' && (
+                                          <DropdownMenuItem onClick={() => handleIssueSubcontract(existingContract.subcontract_id)}>
+                                            <Send className="w-4 h-4 mr-2" /> Send Subcontract
+                                          </DropdownMenuItem>
+                                        )}
+                                      </>
+                                    )}
+                                    {existingContract?.status === 'issued' && (
+                                      <DropdownMenuItem onClick={() => handleSignSubcontract(existingContract.subcontract_id)}>
+                                        <CheckCircle2 className="w-4 h-4 mr-2" /> Sign Subcontract
                                       </DropdownMenuItem>
                                     )}
-                                    {existingContract?.status === 'draft' && (
-                                      <DropdownMenuItem onClick={() => handleIssueSubcontract(existingContract.subcontract_id)}>
-                                        <Send className="w-4 h-4 mr-2" /> Send Subcontract
+                                    {existingContract?.status === 'signed' && (
+                                      <DropdownMenuItem disabled className="text-emerald-600">
+                                        <CheckCircle2 className="w-4 h-4 mr-2" /> Subcontract Signed
                                       </DropdownMenuItem>
                                     )}
                                     <DropdownMenuItem onClick={() => openNoticeForTask(task)}>
