@@ -258,6 +258,9 @@ frontend:
       - working: true
         agent: "testing"
         comment: "✅ Issue Subcontract flow verified through task action dropdown. Option available in task actions menu, integrated with backend subcontract creation APIs."
+      - working: true
+        agent: "testing"
+        comment: "✅ COMPREHENSIVE ISSUE SUBCONTRACT WORKFLOW TESTED: Complete end-to-end workflow verified - (1) PATCH /api/projects/{project_id}/program/{task_id} for assigning subcontractors ✅, (2) POST /api/projects/{project_id}/subcontracts creates draft subcontract ✅, (3) POST /api/projects/{project_id}/subcontracts/{id}/issue changes status to issued ✅, (4) POST /api/projects/{project_id}/subcontracts/{id}/sign changes status to signed ✅. Full workflow: Create unassigned task → Assign subcontractor → Create draft subcontract → Issue subcontract → Sign subcontract. All status transitions working correctly (draft → issued → signed). Backend APIs fully functional for Issue Subcontract workflow from Gantt chart task actions."
 
   - task: "Issue Notice Flow"
     implemented: true
