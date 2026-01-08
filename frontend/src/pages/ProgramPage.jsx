@@ -1234,7 +1234,7 @@ export const ProgramPage = ({ user }) => {
             </DialogHeader>
             <div className="py-4">
               <p className="text-sm text-slate-600 mb-4">
-                To issue a subcontract for <span className="font-medium">"{pendingSubcontractTask?.name}"</span>, please select or add a subcontractor first.
+                To issue a subcontract for <span className="font-medium">&ldquo;{pendingSubcontractTask?.name}&rdquo;</span>, please select or add a subcontractor first.
               </p>
               
               {subcontractors.length > 0 ? (
