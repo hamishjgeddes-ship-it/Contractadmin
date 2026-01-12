@@ -857,6 +857,19 @@ export const DashboardPage = ({ user }) => {
                     <SelectItem value="name">Sort by Name</SelectItem>
                   </SelectContent>
                 </Select>
+
+                {/* Archived Toggle */}
+                {isLawyer && archivedProjects.length > 0 && (
+                  <Button
+                    variant={showArchived ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => setShowArchived(!showArchived)}
+                    className="rounded-sm"
+                  >
+                    <Archive className="w-4 h-4 mr-2" />
+                    {showArchived ? "Showing Archived" : `Archived (${archivedProjects.length})`}
+                  </Button>
+                )}
               </div>
 
               {/* View Toggle */}
