@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -43,6 +44,7 @@ import {
   Trash2,
   Edit,
   XCircle,
+  FileText,
 } from "lucide-react";
 import axios from "axios";
 import { API } from "../App";
@@ -50,12 +52,24 @@ import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 
 export const ProjectEventsSection = ({ projectId, user, onStatusChange }) => {
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [triggers, setTriggers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [dueDate, setDueDate] = useState(null);
+  const [generateDocDialogOpen, setGenerateDocDialogOpen] = useState(false);
+  const [selectedEventForDoc, setSelectedEventForDoc] = useState(null);
+  const [responseDueDate, setResponseDueDate] = useState(null);
+
+  const [docForm, setDocForm] = useState({
+    notice_type: "",
+    title: "",
+    content: "",
+    claimed_amount: "",
+    response_due_date: null,
+  });
 
   const [form, setForm] = useState({
     trigger_id: "",
