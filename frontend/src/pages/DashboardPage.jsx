@@ -89,6 +89,8 @@ export const DashboardPage = ({ user }) => {
   const [viewMode, setViewMode] = useState("list"); // "list" or "cards"
   const [sortBy, setSortBy] = useState("status"); // "status", "client", "due_date", "name"
   const [filterClient, setFilterClient] = useState("all");
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedProjects, setArchivedProjects] = useState([]);
   
   // Selected triggers for new project
   const [selectedTriggers, setSelectedTriggers] = useState([]);
