@@ -243,6 +243,44 @@ export const ProjectEventsSection = ({ projectId, user, onStatusChange }) => {
     }
   };
 
+  const openGenerateDocDialog = (event) => {
+    setSelectedEventForDoc(event);
+    const trigger = triggers.find(t => t.trigger_id === event.trigger_id);
+    
+    // Pre-fill the form with event data
+    setDocForm({
+      notice_type: trigger?.event_type || "general",
+      title: `${event.title} - Notice`,
+      content: `Project: ${projectId}\nEvent: ${event.title}\n${event.description || ""}\n\nValue: ${event.value ? `$${event.value.toLocaleString()}` : "N/A"}\nDue Date: ${event.due_date || "Not set"}\n\n[Additional details to be added]`,
+      claimed_amount: event.value?.toString() || "",
+    });
+    setResponseDueDate(null);
+    setGenerateDocDialogOpen(true);
+  };
+
+  const handleGenerateDocument = async () => {
+    try {
+      await axios.post(`${API}/notices`, {
+        project_id: projectId,
+        title: docForm.title,
+        notice_type: docForm.notice_type,
+        content: docForm.content,
+        claimed_amount: docForm.claimed_amount ? parseFloat(docForm.claimed_amount) : null,
+        response_due_date: responseDueDate ? format(responseDueDate, "yyyy-MM-dd") : null,
+        linked_event_id: selectedEventForDoc?.event_id,
+      }, { withCredentials: true });
+      
+      toast.success("Notice/Claim document created");
+      setGenerateDocDialogOpen(false);
+      setSelectedEventForDoc(null);
+      
+      // Navigate to notices page
+      navigate(`/notices`);
+    } catch (error) {
+      toast.error("Failed to create document");
+    }
+  };
+
   const getStatusColorClasses = (color) => {
     switch (color) {
       case "red": return "bg-red-500";
