@@ -286,7 +286,7 @@ export const DashboardPage = ({ user }) => {
 
   // Sort and filter projects
   const getFilteredProjects = () => {
-    let filtered = [...projects];
+    let filtered = showArchived ? [...archivedProjects] : [...projects];
     
     // Filter by client
     if (filterClient !== "all") {
