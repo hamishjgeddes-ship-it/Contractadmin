@@ -209,6 +209,24 @@ class DocumentCreate(BaseModel):
     category: str = "general"
     description: Optional[str] = None
 
+class EmailDraft(BaseModel):
+    """Store email drafts for later sending"""
+    draft_id: str = Field(default_factory=lambda: f"email_{uuid.uuid4().hex[:12]}")
+    project_id: str
+    to_email: str
+    subject: str
+    body: str
+    status: str = "draft"  # draft, sent
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    sent_at: Optional[datetime] = None
+
+class EmailDraftCreate(BaseModel):
+    project_id: str
+    to_email: str
+    subject: str
+    body: str
+
 class AssistanceRequest(BaseModel):
     request_id: str = Field(default_factory=lambda: f"req_{uuid.uuid4().hex[:12]}")
     project_id: str
