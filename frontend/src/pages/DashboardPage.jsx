@@ -129,6 +129,7 @@ export const DashboardPage = ({ user }) => {
       if (isLawyer) {
         requests.push(axios.get(`${API}/clients`, { withCredentials: true }));
         requests.push(axios.get(`${API}/triggers`, { withCredentials: true }));
+        requests.push(axios.get(`${API}/projects/archived`, { withCredentials: true }));
       }
       
       const results = await Promise.all(requests);
@@ -141,6 +142,9 @@ export const DashboardPage = ({ user }) => {
         setTriggers(results[3].data);
         // Pre-select all triggers by default
         setSelectedTriggers(results[3].data.map(t => t.trigger_id));
+      }
+      if (isLawyer && results[4]) {
+        setArchivedProjects(results[4].data);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
