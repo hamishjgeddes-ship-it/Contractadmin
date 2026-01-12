@@ -55,9 +55,13 @@ class Project(BaseModel):
     contract_type: str
     description: Optional[str] = None
     status: str = "active"  # active, completed, on_hold
+    archived: bool = False  # Archived projects don't show in main list
     # Value tracking (Cost)
     starting_value: float = 0.0
     current_value: float = 0.0
+    # Claims tracking
+    total_claimed: float = 0.0
+    total_approved: float = 0.0
     # Date tracking (Time)
     start_date: Optional[str] = None
     original_completion_date: Optional[str] = None
