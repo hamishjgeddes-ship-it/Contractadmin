@@ -532,6 +532,10 @@ export const ProjectEventsSection = ({ projectId, user, onStatusChange }) => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openGenerateDocDialog(event)}>
+                        <FileText className="w-4 h-4 mr-2 text-blue-500" /> Generate Document
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => handleStatusUpdate(event.event_id, "completed")}>
                         <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-500" /> Mark Complete
                       </DropdownMenuItem>
