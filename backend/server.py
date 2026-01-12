@@ -1060,6 +1060,42 @@ async def issue_notice(notice_id: str, user: User = Depends(require_lawyer)):
     
     return {"message": "Notice issued"}
 
+# ============ EMAIL DRAFTS ENDPOINTS ============
+
+@api_router.get("/projects/{project_id}/emails", response_model=List[dict])
+async def list_email_drafts(project_id: str, user: User = Depends(require_lawyer)):
+    """List email drafts for a project."""
+    drafts = await db.email_drafts.find({"project_id": project_id}, {"_id": 0}).to_list(100)
+    return drafts
+
+@api_router.post("/projects/{project_id}/emails", response_model=dict)
+async def create_email_draft(project_id: str, email_data: EmailDraftCreate, user: User = Depends(require_lawyer)):
+    """Create an email draft."""
+    draft = EmailDraft(**email_data.model_dump(), created_by=user.user_id)
+    doc = draft.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.email_drafts.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+@api_router.patch("/projects/{project_id}/emails/{draft_id}")
+async def update_email_draft(project_id: str, draft_id: str, updates: dict, user: User = Depends(require_lawyer)):
+    """Update an email draft."""
+    result = await db.email_drafts.update_one(
+        {"draft_id": draft_id, "project_id": project_id}, 
+        {"$set": updates}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Email draft not found")
+    return {"message": "Draft updated"}
+
+@api_router.delete("/projects/{project_id}/emails/{draft_id}")
+async def delete_email_draft(project_id: str, draft_id: str, user: User = Depends(require_lawyer)):
+    """Delete an email draft."""
+    result = await db.email_drafts.delete_one({"draft_id": draft_id, "project_id": project_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Email draft not found")
+    return {"message": "Draft deleted"}
+
 # ============ QUESTIONNAIRE ENDPOINTS ============
 
 @api_router.get("/questionnaires", response_model=List[dict])
