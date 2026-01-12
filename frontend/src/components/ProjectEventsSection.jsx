@@ -594,6 +594,101 @@ export const ProjectEventsSection = ({ projectId, user, onStatusChange }) => {
           </div>
         )}
       </CardContent>
+
+      {/* Generate Document Dialog */}
+      <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Generate Notice/Claim</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            {selectedEventForDoc && (
+              <div className="bg-slate-50 p-3 rounded-sm">
+                <p className="text-xs text-slate-500 uppercase font-mono">From Event</p>
+                <p className="font-medium">{selectedEventForDoc.title}</p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label>Document Type *</Label>
+              <Select
+                value={docForm.notice_type || undefined}
+                onValueChange={(v) => setDocForm({ ...docForm, notice_type: v })}
+              >
+                <SelectTrigger className="rounded-sm">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {noticeTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Title *</Label>
+              <Input
+                value={docForm.title}
+                onChange={(e) => setDocForm({ ...docForm, title: e.target.value })}
+                className="rounded-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Claimed Amount ($)</Label>
+                <Input
+                  type="number"
+                  value={docForm.claimed_amount}
+                  onChange={(e) => setDocForm({ ...docForm, claimed_amount: e.target.value })}
+                  placeholder="0"
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Response Due Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal rounded-sm">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {responseDueDate ? format(responseDueDate, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={responseDueDate} onSelect={setResponseDueDate} initialFocus />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Content</Label>
+              <Textarea
+                value={docForm.content}
+                onChange={(e) => setDocForm({ ...docForm, content: e.target.value })}
+                rows={6}
+                className="rounded-sm font-mono text-sm"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => setGenerateDocDialogOpen(false)} className="rounded-sm">
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleGenerateDocument} 
+                className="bg-slate-900 hover:bg-slate-800 rounded-sm"
+                disabled={!docForm.title || !docForm.notice_type}
+              >
+                <FileText className="w-4 h-4 mr-2" /> Create Document
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
