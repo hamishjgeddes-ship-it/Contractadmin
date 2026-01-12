@@ -953,14 +953,85 @@ async def create_notice(notice_data: NoticeCreate, user: User = Depends(require_
 
 @api_router.patch("/notices/{notice_id}")
 async def update_notice(notice_id: str, updates: dict, user: User = Depends(require_lawyer)):
-    """Update notice (lawyers only)."""
+    """Update notice (lawyers only). Tracks edit history."""
+    notice = await db.notices.find_one({"notice_id": notice_id}, {"_id": 0})
+    if not notice:
+        raise HTTPException(status_code=404, detail="Notice not found")
+    
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # Track edits if notice was already submitted
+    if notice.get("status") in ["submitted", "approved", "closed"]:
+        updates["edited_at"] = datetime.now(timezone.utc).isoformat()
+        updates["edit_count"] = notice.get("edit_count", 0) + 1
+    
     if "issued_at" in updates and isinstance(updates["issued_at"], datetime):
         updates["issued_at"] = updates["issued_at"].isoformat()
-    result = await db.notices.update_one({"notice_id": notice_id}, {"$set": updates})
+    
+    await db.notices.update_one({"notice_id": notice_id}, {"$set": updates})
+    
+    # Update project totals if claimed/approved amounts changed
+    if "claimed_amount" in updates or "approved_amount" in updates:
+        await update_project_totals(notice["project_id"])
+    
+    return {"message": "Notice updated"}
+
+@api_router.post("/notices/{notice_id}/submit")
+async def submit_notice(notice_id: str, user: User = Depends(require_lawyer)):
+    """Submit a notice/claim (changes status to submitted)."""
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.notices.update_one(
+        {"notice_id": notice_id},
+        {"$set": {"status": "submitted", "submitted_date": now, "updated_at": now}}
+    )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Notice not found")
-    return {"message": "Notice updated"}
+    
+    notice = await db.notices.find_one({"notice_id": notice_id}, {"_id": 0})
+    await update_project_totals(notice["project_id"])
+    
+    return {"message": "Notice submitted"}
+
+@api_router.post("/notices/{notice_id}/approve")
+async def approve_notice(notice_id: str, approved_amount: float, user: User = Depends(require_lawyer)):
+    """Approve a notice/claim with approved amount."""
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.notices.update_one(
+        {"notice_id": notice_id},
+        {"$set": {
+            "status": "approved", 
+            "approved_amount": approved_amount,
+            "approved_date": now, 
+            "updated_at": now
+        }}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notice not found")
+    
+    notice = await db.notices.find_one({"notice_id": notice_id}, {"_id": 0})
+    await update_project_totals(notice["project_id"])
+    
+    return {"message": "Notice approved", "approved_amount": approved_amount}
+
+async def update_project_totals(project_id: str):
+    """Update project's total claimed and approved amounts."""
+    pipeline = [
+        {"$match": {"project_id": project_id, "status": {"$in": ["submitted", "approved", "closed"]}}},
+        {"$group": {
+            "_id": None,
+            "total_claimed": {"$sum": {"$ifNull": ["$claimed_amount", 0]}},
+            "total_approved": {"$sum": {"$ifNull": ["$approved_amount", 0]}}
+        }}
+    ]
+    result = await db.notices.aggregate(pipeline).to_list(1)
+    if result:
+        await db.projects.update_one(
+            {"project_id": project_id},
+            {"$set": {
+                "total_claimed": result[0].get("total_claimed", 0),
+                "total_approved": result[0].get("total_approved", 0)
+            }}
+        )
 
 @api_router.post("/notices/{notice_id}/issue")
 async def issue_notice(notice_id: str, user: User = Depends(require_lawyer)):
