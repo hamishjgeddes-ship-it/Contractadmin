@@ -728,21 +728,55 @@ async def update_user_role(user_id: str, role: str, user: User = Depends(require
 # ============ PROJECT ENDPOINTS ============
 
 @api_router.get("/projects", response_model=List[dict])
-async def list_projects(user: User = Depends(get_current_user)):
-    """List projects. Lawyers see all, clients see their own."""
+async def list_projects(user: User = Depends(get_current_user), include_archived: bool = False):
+    """List projects. Lawyers see all, clients see their own. Archived excluded by default."""
+    query = {} if include_archived else {"archived": {"$ne": True}}
+    
     if user.role in ["lawyer", "admin"]:
-        projects = await db.projects.find({}, {"_id": 0}).to_list(1000)
+        projects = await db.projects.find(query, {"_id": 0}).to_list(1000)
     else:
-        projects = await db.projects.find({"client_email": user.email}, {"_id": 0}).to_list(1000)
+        query["client_email"] = user.email
+        projects = await db.projects.find(query, {"_id": 0}).to_list(1000)
     return projects
 
+@api_router.get("/projects/archived", response_model=List[dict])
+async def list_archived_projects(user: User = Depends(require_lawyer)):
+    """List archived projects (lawyers only)."""
+    projects = await db.projects.find({"archived": True}, {"_id": 0}).to_list(1000)
+    return projects
+
+@api_router.post("/projects/{project_id}/archive")
+async def archive_project(project_id: str, user: User = Depends(require_lawyer)):
+    """Archive a project."""
+    result = await db.projects.update_one(
+        {"project_id": project_id},
+        {"$set": {"archived": True, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"message": "Project archived"}
+
+@api_router.post("/projects/{project_id}/unarchive")
+async def unarchive_project(project_id: str, user: User = Depends(require_lawyer)):
+    """Unarchive a project."""
+    result = await db.projects.update_one(
+        {"project_id": project_id},
+        {"$set": {"archived": False, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"message": "Project unarchived"}
+
 @api_router.get("/projects/with-status", response_model=List[dict])
-async def list_projects_with_status(user: User = Depends(get_current_user)):
+async def list_projects_with_status(user: User = Depends(get_current_user), include_archived: bool = False):
     """List all projects with their calculated status colors."""
+    query = {} if include_archived else {"archived": {"$ne": True}}
+    
     if user.role in ["lawyer", "admin"]:
-        projects = await db.projects.find({}, {"_id": 0}).to_list(1000)
+        projects = await db.projects.find(query, {"_id": 0}).to_list(1000)
     else:
-        projects = await db.projects.find({"client_email": user.email}, {"_id": 0}).to_list(1000)
+        query["client_email"] = user.email
+        projects = await db.projects.find(query, {"_id": 0}).to_list(1000)
     
     # Get all events
     project_ids = [p["project_id"] for p in projects]
