@@ -125,12 +125,25 @@ class Notice(BaseModel):
     notice_id: str = Field(default_factory=lambda: f"ntc_{uuid.uuid4().hex[:12]}")
     project_id: str
     title: str
-    notice_type: str  # variation, delay, latent_condition, design_issue, contamination, general
+    notice_type: str  # variation, delay, latent_condition, design_issue, contamination, general, claim
     content: str
-    status: str = "draft"  # draft, issued, responded, closed
+    status: str = "draft"  # draft, submitted, approved, closed
     recipient_email: Optional[str] = None
+    # Financial tracking
+    claimed_amount: Optional[float] = None
+    approved_amount: Optional[float] = None
+    # Dates
+    submitted_date: Optional[str] = None
+    response_due_date: Optional[str] = None
+    approved_date: Optional[str] = None
     issued_at: Optional[datetime] = None
     response_deadline: Optional[datetime] = None
+    # Edit tracking
+    edited_at: Optional[str] = None
+    edit_count: int = 0
+    # Linked event (if generated from trigger)
+    linked_event_id: Optional[str] = None
+    # Audit
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -142,6 +155,9 @@ class NoticeCreate(BaseModel):
     content: str
     recipient_email: Optional[str] = None
     response_deadline: Optional[datetime] = None
+    claimed_amount: Optional[float] = None
+    response_due_date: Optional[str] = None
+    linked_event_id: Optional[str] = None
 
 class Questionnaire(BaseModel):
     questionnaire_id: str = Field(default_factory=lambda: f"qst_{uuid.uuid4().hex[:12]}")
