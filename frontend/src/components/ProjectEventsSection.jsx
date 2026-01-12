@@ -81,6 +81,19 @@ export const ProjectEventsSection = ({ projectId, user, onStatusChange }) => {
 
   const isLawyer = user?.role === "lawyer" || user?.role === "admin";
 
+  const noticeTypes = [
+    { value: "variation", label: "Variation" },
+    { value: "delay", label: "Delay Notice" },
+    { value: "latent_condition", label: "Latent Condition" },
+    { value: "design_issue", label: "Design Issue" },
+    { value: "contamination", label: "Contamination" },
+    { value: "extension_of_time", label: "Extension of Time" },
+    { value: "payment_claim", label: "Payment Claim" },
+    { value: "defect", label: "Defect Notice" },
+    { value: "dispute", label: "Dispute Notice" },
+    { value: "general", label: "General Notice" },
+  ];
+
   const fetchData = async () => {
     try {
       const [eventsRes, triggersRes] = await Promise.all([
