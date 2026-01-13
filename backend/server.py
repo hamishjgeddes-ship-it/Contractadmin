@@ -144,6 +144,10 @@ class Notice(BaseModel):
     # Financial tracking
     claimed_amount: Optional[float] = None
     approved_amount: Optional[float] = None
+    # Likely claim tracking
+    likely_claim_needed: bool = False
+    claim_document_type: Optional[str] = None  # variation_claim, delay_claim, eot_claim, payment_claim, defect_claim, dispute_claim
+    claim_due_date: Optional[str] = None  # Auto-calculated based on workflow rules
     # Dates
     submitted_date: Optional[str] = None
     response_due_date: Optional[str] = None
@@ -170,6 +174,8 @@ class NoticeCreate(BaseModel):
     claimed_amount: Optional[float] = None
     response_due_date: Optional[str] = None
     linked_event_id: Optional[str] = None
+    likely_claim_needed: bool = False
+    claim_document_type: Optional[str] = None
 
 class Questionnaire(BaseModel):
     questionnaire_id: str = Field(default_factory=lambda: f"qst_{uuid.uuid4().hex[:12]}")
