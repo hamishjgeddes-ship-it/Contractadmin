@@ -165,6 +165,51 @@ backend:
         agent: "testing"
         comment: "✅ Projects with status API working correctly after route order fix. Returns projects with status_color, next_due_date, pending_events_count fields. Status colors calculated properly (red/green observed)."
 
+  - task: "Notice Status Flow APIs"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/notices (create with claimed_amount), POST /api/notices/{id}/submit, POST /api/notices/{id}/approve with approved_amount query param, project totals update."
+      - working: true
+        agent: "testing"
+        comment: "✅ Notice status flow working perfectly. Tested complete workflow: create notice with claimed_amount ($25,000), submit notice (status: draft -> submitted), approve notice with approved_amount ($20,000) as query param (status: submitted -> approved), project totals updated correctly (claimed: $25,000, approved: $20,000). All status transitions and amount tracking working as expected."
+
+  - task: "Archive Project APIs"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/projects/{id}/archive, GET /api/projects (excludes archived), GET /api/projects/archived, POST /api/projects/{id}/unarchive."
+      - working: true
+        agent: "testing"
+        comment: "✅ Archive project flow working perfectly. Tested complete workflow: archive project (removed from main list), verify archived project in archived list, unarchive project (restored to main list). All endpoints working correctly with proper filtering and status management."
+
+  - task: "Email Drafts APIs"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/projects/{id}/emails (create draft), GET /api/projects/{id}/emails (list drafts)."
+      - working: true
+        agent: "testing"
+        comment: "✅ Email drafts APIs working perfectly. Tested: create email draft (status: draft, proper field storage), list drafts for project (correct filtering), multiple drafts support (created 2 drafts, both listed correctly). Draft details match created data with proper to_email, subject, and body fields."
+
 frontend:
   - task: "Dashboard Clients Tab"
     implemented: true
