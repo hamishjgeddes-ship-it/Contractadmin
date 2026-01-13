@@ -75,6 +75,14 @@ class Project(BaseModel):
     # Team Members
     client_team_members: Optional[str] = None
     bc_team_members: Optional[str] = None
+    # Contract Workflow Rules (auto-calculate dates)
+    workflow_rules: dict = Field(default_factory=lambda: {
+        "notice_to_claim_days": 5,  # Days after notice to submit claim
+        "claim_to_response_days": 14,  # Days for response after claim
+        "eot_notice_days": 7,  # Days to submit EOT notice
+        "variation_claim_days": 14,  # Days to submit variation claim
+        "payment_claim_days": 28,  # Days for payment claim cycle
+    })
     # Legacy fields
     key_dates: dict = Field(default_factory=dict)
     commercial_params: dict = Field(default_factory=dict)
