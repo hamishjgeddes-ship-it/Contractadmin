@@ -1744,6 +1744,12 @@ Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"
         self.test_issue_subcontract_workflow()
         self.test_assign_subcontractor_to_existing_task()
         
+        # NEW FEATURE TESTS (Review Request)
+        print("\n🆕 Testing New Features (Review Request)...")
+        self.test_notice_status_flow()
+        self.test_archive_project_flow()
+        self.test_email_drafts_flow()
+        
         # Notification tests
         self.test_list_notifications()
         
