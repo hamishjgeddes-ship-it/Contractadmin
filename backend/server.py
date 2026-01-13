@@ -996,6 +996,25 @@ async def create_notice(notice_data: NoticeCreate, user: User = Depends(require_
         doc['issued_at'] = doc['issued_at'].isoformat()
     if doc.get('response_deadline'):
         doc['response_deadline'] = doc['response_deadline'].isoformat()
+    
+    # Auto-calculate claim_due_date if likely_claim_needed is True
+    if doc.get('likely_claim_needed') and doc.get('claim_document_type'):
+        project = await db.projects.find_one({"project_id": notice_data.project_id}, {"_id": 0})
+        if project:
+            workflow_rules = project.get('workflow_rules', {})
+            # Map claim type to workflow rule
+            claim_days_map = {
+                'variation_claim': workflow_rules.get('variation_claim_days', 14),
+                'delay_claim': workflow_rules.get('notice_to_claim_days', 5),
+                'eot_claim': workflow_rules.get('eot_notice_days', 7),
+                'payment_claim': workflow_rules.get('payment_claim_days', 28),
+                'defect_claim': workflow_rules.get('notice_to_claim_days', 5),
+                'dispute_claim': workflow_rules.get('notice_to_claim_days', 5),
+            }
+            days_to_add = claim_days_map.get(doc['claim_document_type'], 14)
+            claim_due = datetime.now(timezone.utc) + timedelta(days=days_to_add)
+            doc['claim_due_date'] = claim_due.strftime('%Y-%m-%d')
+    
     await db.notices.insert_one(doc)
     return {k: v for k, v in doc.items() if k != "_id"}
 
