@@ -413,7 +413,7 @@ export const ProjectDetailPage = ({ user }) => {
                       <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-sm">
                         <div>
                           <p className="font-medium text-red-800">Archive Project</p>
-                          <p className="text-xs text-red-600">Archived projects won't appear in the main list</p>
+                          <p className="text-xs text-red-600">Archived projects will not appear in the main list</p>
                         </div>
                         <Button 
                           variant="outline" 
