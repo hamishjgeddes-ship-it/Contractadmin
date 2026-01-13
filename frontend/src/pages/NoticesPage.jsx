@@ -73,6 +73,8 @@ export const NoticesPage = ({ user }) => {
     recipient_email: "",
     claimed_amount: "",
     response_due_date: null,
+    likely_claim_needed: false,
+    claim_document_type: "",
   });
 
   const noticeTypes = [
@@ -86,6 +88,15 @@ export const NoticesPage = ({ user }) => {
     { value: "defect", label: "Defect Notice" },
     { value: "dispute", label: "Dispute Notice" },
     { value: "general", label: "General Notice" },
+  ];
+
+  const claimDocumentTypes = [
+    { value: "variation_claim", label: "Variation Claim" },
+    { value: "delay_claim", label: "Delay/Disruption Claim" },
+    { value: "eot_claim", label: "Extension of Time Claim" },
+    { value: "payment_claim", label: "Payment Claim" },
+    { value: "defect_claim", label: "Defect Rectification Claim" },
+    { value: "dispute_claim", label: "Dispute Claim" },
   ];
 
   const fetchData = async () => {
