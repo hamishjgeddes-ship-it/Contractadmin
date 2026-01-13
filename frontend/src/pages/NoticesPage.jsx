@@ -127,6 +127,8 @@ export const NoticesPage = ({ user }) => {
       content: "",
       recipient_email: "",
       claimed_amount: "",
+      likely_claim_needed: false,
+      claim_document_type: "",
     });
     setResponseDueDate(null);
   };
@@ -139,6 +141,8 @@ export const NoticesPage = ({ user }) => {
         ...formData,
         claimed_amount: formData.claimed_amount ? parseFloat(formData.claimed_amount) : null,
         response_due_date: responseDueDate ? format(responseDueDate, "yyyy-MM-dd") : null,
+        likely_claim_needed: formData.likely_claim_needed,
+        claim_document_type: formData.likely_claim_needed ? formData.claim_document_type : null,
       }, { withCredentials: true });
       toast.success("Notice created successfully");
       setDialogOpen(false);
