@@ -65,6 +65,7 @@ import {
   AlertCircle,
   ChevronRight,
   Zap,
+  Archive,
 } from "lucide-react";
 import axios from "axios";
 import { API } from "../App";
