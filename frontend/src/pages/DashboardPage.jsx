@@ -785,28 +785,40 @@ export const DashboardPage = ({ user }) => {
             </CardContent>
           </Card>
           
-          <Card className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors">
+          <Card 
+            className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
+            onClick={() => navigate("/deadlines")}
+          >
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Pending Deadlines</p>
               <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.pending_deadlines || 0}</p>
             </CardContent>
           </Card>
           
-          <Card className="border border-red-200 bg-red-50 shadow-none rounded-sm cursor-pointer hover:border-red-300 transition-colors">
+          <Card 
+            className="border border-red-200 bg-red-50 shadow-none rounded-sm cursor-pointer hover:border-red-300 transition-colors"
+            onClick={() => navigate("/deadlines")}
+          >
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-red-600 font-mono">Overdue</p>
               <p className="text-2xl font-mono font-bold text-red-700 mt-1">{stats?.overdue_deadlines || 0}</p>
             </CardContent>
           </Card>
           
-          <Card className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors">
+          <Card 
+            className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
+            onClick={() => navigate("/notices")}
+          >
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Draft Notices</p>
               <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.draft_notices || 0}</p>
             </CardContent>
           </Card>
           
-          <Card className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors">
+          <Card 
+            className="border border-slate-200 shadow-none rounded-sm cursor-pointer hover:border-slate-300 transition-colors"
+            onClick={() => navigate("/notices")}
+          >
             <CardContent className="p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Issued Notices</p>
               <p className="text-2xl font-mono font-bold text-slate-900 mt-1">{stats?.issued_notices || 0}</p>
