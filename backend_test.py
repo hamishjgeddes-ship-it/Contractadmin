@@ -1383,6 +1383,288 @@ Plumbing Rough-in,2024-06-01,2024-07-15,Aqua Tech,Plumbing,contact@aquatech.com"
         except Exception as e:
             return self.log_test("Trigger Templates Integration with Project Creation", False, f"Error: {str(e)}")
 
+    # ============ NEW FEATURE TESTS (Review Request) ============
+    
+    def test_notice_status_flow(self):
+        """Test the complete notice status flow: create -> submit -> approve"""
+        print("\n🔄 Testing Notice Status Flow...")
+        
+        if not self.project_id:
+            return self.log_test("Notice Status Flow", False, "No project ID available")
+        
+        flow_success = True
+        flow_details = []
+        notice_id = None
+        
+        try:
+            # Step 1: Create notice with claimed_amount
+            notice_data = {
+                "project_id": self.project_id,
+                "title": "Test Variation Notice - Status Flow",
+                "notice_type": "variation",
+                "content": "Test notice for status flow testing with claimed amount",
+                "recipient_email": "client@testcorp.com",
+                "claimed_amount": 25000.0
+            }
+            response = requests.post(f"{self.api_url}/notices", json=notice_data, headers=self.headers, timeout=10)
+            
+            if response.status_code != 200:
+                flow_success = False
+                flow_details.append(f"Failed to create notice: {response.status_code}")
+            else:
+                data = response.json()
+                notice_id = data.get('notice_id')
+                claimed_amount = data.get('claimed_amount')
+                status = data.get('status')
+                flow_details.append(f"✅ Created notice: {notice_id}, Status: {status}, Claimed: ${claimed_amount}")
+                
+                if status != 'draft':
+                    flow_success = False
+                    flow_details.append(f"❌ Expected draft status, got: {status}")
+                
+                # Step 2: Submit notice
+                response = requests.post(f"{self.api_url}/notices/{notice_id}/submit", json={}, headers=self.headers, timeout=10)
+                
+                if response.status_code != 200:
+                    flow_success = False
+                    flow_details.append(f"Failed to submit notice: {response.status_code}")
+                else:
+                    flow_details.append("✅ Successfully submitted notice")
+                    
+                    # Verify status changed to submitted
+                    response = requests.get(f"{self.api_url}/notices", headers=self.headers, timeout=10)
+                    if response.status_code == 200:
+                        notices = response.json()
+                        submitted_notice = next((n for n in notices if n['notice_id'] == notice_id), None)
+                        if submitted_notice and submitted_notice.get('status') == 'submitted':
+                            flow_details.append("✅ Notice status changed to submitted")
+                        else:
+                            flow_success = False
+                            flow_details.append(f"❌ Expected submitted status, got: {submitted_notice.get('status') if submitted_notice else 'not found'}")
+                    
+                    # Step 3: Approve notice with approved_amount (as query param)
+                    approved_amount = 20000.0
+                    response = requests.post(f"{self.api_url}/notices/{notice_id}/approve?approved_amount={approved_amount}", 
+                                           json={}, headers=self.headers, timeout=10)
+                    
+                    if response.status_code != 200:
+                        flow_success = False
+                        flow_details.append(f"Failed to approve notice: {response.status_code}")
+                    else:
+                        approval_data = response.json()
+                        returned_amount = approval_data.get('approved_amount')
+                        flow_details.append(f"✅ Successfully approved notice with amount: ${returned_amount}")
+                        
+                        # Verify status changed to approved and amounts are correct
+                        response = requests.get(f"{self.api_url}/notices", headers=self.headers, timeout=10)
+                        if response.status_code == 200:
+                            notices = response.json()
+                            approved_notice = next((n for n in notices if n['notice_id'] == notice_id), None)
+                            if approved_notice:
+                                final_status = approved_notice.get('status')
+                                final_claimed = approved_notice.get('claimed_amount')
+                                final_approved = approved_notice.get('approved_amount')
+                                
+                                if final_status == 'approved':
+                                    flow_details.append("✅ Notice status changed to approved")
+                                else:
+                                    flow_success = False
+                                    flow_details.append(f"❌ Expected approved status, got: {final_status}")
+                                
+                                if final_claimed == 25000.0 and final_approved == 20000.0:
+                                    flow_details.append(f"✅ Amounts correct - Claimed: ${final_claimed}, Approved: ${final_approved}")
+                                else:
+                                    flow_success = False
+                                    flow_details.append(f"❌ Amount mismatch - Claimed: ${final_claimed}, Approved: ${final_approved}")
+                        
+                        # Step 4: Verify project totals updated
+                        response = requests.get(f"{self.api_url}/projects/{self.project_id}", headers=self.headers, timeout=10)
+                        if response.status_code == 200:
+                            project = response.json()
+                            total_claimed = project.get('total_claimed', 0)
+                            total_approved = project.get('total_approved', 0)
+                            flow_details.append(f"✅ Project totals updated - Claimed: ${total_claimed}, Approved: ${total_approved}")
+                        else:
+                            flow_success = False
+                            flow_details.append("❌ Failed to verify project totals")
+            
+            details = "; ".join(flow_details)
+            return self.log_test("Notice Status Flow", flow_success, details)
+            
+        except Exception as e:
+            return self.log_test("Notice Status Flow", False, f"Error: {str(e)}")
+
+    def test_archive_project_flow(self):
+        """Test the complete archive project flow"""
+        print("\n🔄 Testing Archive Project Flow...")
+        
+        if not self.project_id:
+            return self.log_test("Archive Project Flow", False, "No project ID available")
+        
+        flow_success = True
+        flow_details = []
+        
+        try:
+            # Step 1: Archive the project
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/archive", json={}, headers=self.headers, timeout=10)
+            
+            if response.status_code != 200:
+                flow_success = False
+                flow_details.append(f"Failed to archive project: {response.status_code}")
+            else:
+                flow_details.append("✅ Successfully archived project")
+                
+                # Step 2: Verify archived project not in main list
+                response = requests.get(f"{self.api_url}/projects", headers=self.headers, timeout=10)
+                if response.status_code == 200:
+                    projects = response.json()
+                    archived_in_main = any(p['project_id'] == self.project_id for p in projects)
+                    if not archived_in_main:
+                        flow_details.append("✅ Archived project not in main projects list")
+                    else:
+                        flow_success = False
+                        flow_details.append("❌ Archived project still appears in main projects list")
+                else:
+                    flow_success = False
+                    flow_details.append(f"Failed to get main projects list: {response.status_code}")
+                
+                # Step 3: Verify archived project in archived list
+                response = requests.get(f"{self.api_url}/projects/archived", headers=self.headers, timeout=10)
+                if response.status_code == 200:
+                    archived_projects = response.json()
+                    found_in_archived = any(p['project_id'] == self.project_id for p in archived_projects)
+                    if found_in_archived:
+                        flow_details.append(f"✅ Found project in archived list ({len(archived_projects)} total archived)")
+                    else:
+                        flow_success = False
+                        flow_details.append("❌ Archived project not found in archived list")
+                else:
+                    flow_success = False
+                    flow_details.append(f"Failed to get archived projects list: {response.status_code}")
+                
+                # Step 4: Unarchive the project
+                response = requests.post(f"{self.api_url}/projects/{self.project_id}/unarchive", json={}, headers=self.headers, timeout=10)
+                
+                if response.status_code != 200:
+                    flow_success = False
+                    flow_details.append(f"Failed to unarchive project: {response.status_code}")
+                else:
+                    flow_details.append("✅ Successfully unarchived project")
+                    
+                    # Step 5: Verify project back in main list
+                    response = requests.get(f"{self.api_url}/projects", headers=self.headers, timeout=10)
+                    if response.status_code == 200:
+                        projects = response.json()
+                        back_in_main = any(p['project_id'] == self.project_id for p in projects)
+                        if back_in_main:
+                            flow_details.append("✅ Unarchived project back in main projects list")
+                        else:
+                            flow_success = False
+                            flow_details.append("❌ Unarchived project not found in main projects list")
+                    else:
+                        flow_success = False
+                        flow_details.append(f"Failed to verify unarchived project: {response.status_code}")
+            
+            details = "; ".join(flow_details)
+            return self.log_test("Archive Project Flow", flow_success, details)
+            
+        except Exception as e:
+            return self.log_test("Archive Project Flow", False, f"Error: {str(e)}")
+
+    def test_email_drafts_flow(self):
+        """Test email drafts creation and listing"""
+        print("\n🔄 Testing Email Drafts Flow...")
+        
+        if not self.project_id:
+            return self.log_test("Email Drafts Flow", False, "No project ID available")
+        
+        flow_success = True
+        flow_details = []
+        draft_id = None
+        
+        try:
+            # Step 1: Create email draft
+            email_data = {
+                "project_id": self.project_id,
+                "to_email": "client@testcorp.com",
+                "subject": "Test Email Draft - Project Update",
+                "body": "This is a test email draft for project communication. Please review the attached documents and provide feedback."
+            }
+            response = requests.post(f"{self.api_url}/projects/{self.project_id}/emails", json=email_data, headers=self.headers, timeout=10)
+            
+            if response.status_code != 200:
+                flow_success = False
+                flow_details.append(f"Failed to create email draft: {response.status_code}")
+            else:
+                data = response.json()
+                draft_id = data.get('draft_id')
+                status = data.get('status')
+                to_email = data.get('to_email')
+                subject = data.get('subject')
+                flow_details.append(f"✅ Created email draft: {draft_id}, Status: {status}, To: {to_email}")
+                
+                if status != 'draft':
+                    flow_success = False
+                    flow_details.append(f"❌ Expected draft status, got: {status}")
+                
+                # Step 2: List email drafts for the project
+                response = requests.get(f"{self.api_url}/projects/{self.project_id}/emails", headers=self.headers, timeout=10)
+                
+                if response.status_code != 200:
+                    flow_success = False
+                    flow_details.append(f"Failed to list email drafts: {response.status_code}")
+                else:
+                    drafts = response.json()
+                    found_draft = any(d['draft_id'] == draft_id for d in drafts)
+                    if found_draft:
+                        flow_details.append(f"✅ Found created draft in list ({len(drafts)} total drafts)")
+                        
+                        # Verify draft details
+                        created_draft = next((d for d in drafts if d['draft_id'] == draft_id), None)
+                        if created_draft:
+                            if (created_draft.get('subject') == email_data['subject'] and 
+                                created_draft.get('to_email') == email_data['to_email']):
+                                flow_details.append("✅ Draft details match created data")
+                            else:
+                                flow_success = False
+                                flow_details.append("❌ Draft details don't match created data")
+                    else:
+                        flow_success = False
+                        flow_details.append("❌ Created draft not found in list")
+                
+                # Step 3: Create another draft to test multiple drafts
+                email_data2 = {
+                    "project_id": self.project_id,
+                    "to_email": "contractor@example.com",
+                    "subject": "Test Email Draft 2 - Variation Notice",
+                    "body": "Second test email draft for variation notice communication."
+                }
+                response = requests.post(f"{self.api_url}/projects/{self.project_id}/emails", json=email_data2, headers=self.headers, timeout=10)
+                
+                if response.status_code == 200:
+                    data2 = response.json()
+                    draft_id2 = data2.get('draft_id')
+                    flow_details.append(f"✅ Created second email draft: {draft_id2}")
+                    
+                    # Verify both drafts in list
+                    response = requests.get(f"{self.api_url}/projects/{self.project_id}/emails", headers=self.headers, timeout=10)
+                    if response.status_code == 200:
+                        drafts = response.json()
+                        if len(drafts) >= 2:
+                            flow_details.append(f"✅ Multiple drafts working ({len(drafts)} total drafts)")
+                        else:
+                            flow_success = False
+                            flow_details.append(f"❌ Expected at least 2 drafts, found {len(drafts)}")
+                else:
+                    flow_success = False
+                    flow_details.append(f"Failed to create second email draft: {response.status_code}")
+            
+            details = "; ".join(flow_details)
+            return self.log_test("Email Drafts Flow", flow_success, details)
+            
+        except Exception as e:
+            return self.log_test("Email Drafts Flow", False, f"Error: {str(e)}")
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚀 Starting Build Compliance Portal Backend Tests")
